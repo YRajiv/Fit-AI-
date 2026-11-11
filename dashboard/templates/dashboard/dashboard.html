@@ -1,0 +1,968 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FitAI Dashboard</title>
+
+    <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+</head>
+
+<body>
+
+<div class="dashboard">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+        <h1>🏋 FitAI</h1>
+        <p>Stronger Every Day</p>
+
+        <ul>
+
+            <li class="active">
+                <a href="/" style="color: inherit; text-decoration: none;">
+                    🏠 Dashboard
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'nutrition_page' %}" style="color: inherit; text-decoration: none;">
+                    🥗 Nutrition
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'workout:workouts' %}" style="color: inherit; text-decoration: none;">
+                    💪 Workout
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'ai_features:posture_check' %}" style="color: inherit; text-decoration: none;">
+                    🤖 AI Posture Check
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'dashboard:chat' %}" style="color: inherit; text-decoration: none;">
+                    💬 AI Fitness Assistant
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'diet_dashboard' %}" style="color: inherit; text-decoration: none;">
+                    🍎 Diet Plan
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'reminders:reminders' %}" style="color: inherit; text-decoration: none;">
+                    🔔 Reminders
+                </a>
+            </li>
+
+            <li>
+                <a href="{% url 'progress:progress' %}" style="color: inherit; text-decoration: none;">
+                    📊 Progress
+                </a>
+            </li>
+
+            <!-- LOGIN / LOGOUT -->
+
+            {% if user.is_authenticated %}
+
+                <li class="logout-item">
+
+                    <form action="{% url 'users:logout' %}" method="POST">
+                        {% csrf_token %}
+
+                        <button type="submit" class="logout-btn">
+                            🚪 Logout
+                        </button>
+
+                    </form>
+
+                </li>
+
+            {% else %}
+
+                <li class="login-item">
+
+                    <a href="{% url 'users:login' %}">
+                        🔐 Login
+                    </a>
+
+                </li>
+
+            {% endif %}
+
+        </ul>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+
+    <main class="content">
+
+        <!-- HEADER -->
+
+        <header>
+
+            <div>
+
+                <h1>
+                    Welcome to FitAI 👋
+                </h1>
+
+                <p>Stay consistent, stay strong!</p>
+
+            </div>
+
+            <div class="date">
+
+                {% now "l, d F Y" %}
+
+                <br>
+
+                {% now "h:i A" %}
+
+            </div>
+
+        </header>
+
+
+        <!-- STATISTICS -->
+
+        <div class="stats">
+
+            <!-- CALORIES -->
+
+            <div class="card">
+
+                <h3>🔥 Calories Burned</h3>
+
+                <h1>
+                    {{ daily_progress.activity_calories|default:"0" }}
+                </h1>
+
+                <p>kcal today</p>
+
+            </div>
+
+
+            <!-- PROTEIN -->
+
+            <div class="card">
+
+                <h3>🥩 Protein Intake</h3>
+
+                <h1>
+                    {{ consumed_protein|default:"0" }}g
+                </h1>
+
+                <p>
+                    g / {{ nutrition_goal.protein_target|default:"0" }}g Target
+                </p>
+
+                {% if planned_protein_today > 0 %}
+
+                    <p style="font-size:10px; color:#c084fc; margin-top:4px;">
+                        Diet Plan Target: ~{{ planned_protein_today }}g
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- WATER -->
+
+            <div class="card">
+
+                <h3>💧 Water Intake</h3>
+
+                <h1>
+                    {{ water_intake.water_amount|default:"0" }}
+                </h1>
+
+                <p>
+                    Liters / {{ water_intake.target_amount|default:"3" }}L
+                </p>
+
+                <div style="display:flex; gap:4px; margin-top:10px;
+                            justify-content:center; flex-wrap:wrap;">
+
+                    <form action="{% url 'dashboard:add_water_quick' %}" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="amount" value="0.25">
+                        <button type="submit" class="water-button">+250ml</button>
+                    </form>
+
+                    <form action="{% url 'dashboard:add_water_quick' %}" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="amount" value="0.5">
+                        <button type="submit" class="water-button">+500ml</button>
+                    </form>
+
+                    <form action="{% url 'dashboard:add_water_quick' %}" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="amount" value="1.0">
+                        <button type="submit" class="water-button">+1L</button>
+                    </form>
+
+                </div>
+
+            </div>
+
+
+            <!-- ACTIVE TIME -->
+
+            <div class="card">
+
+                <h3>❤️ Active Time</h3>
+
+                <h1>
+                    {{ daily_progress.active_minutes|default:"0" }}
+                </h1>
+
+                <p>Minutes Today</p>
+
+            </div>
+
+
+            <!-- COMPLETED WORKOUTS -->
+
+            <div class="card">
+
+                <h3>💪 Completed Workouts</h3>
+
+                <h1>
+                    {{ completed_workout_count|default:"0" }}
+                </h1>
+
+                <p>Workouts Today</p>
+
+            </div>
+
+        </div>
+
+
+        <!-- TODAY'S WORKOUT -->
+
+        <div class="grid">
+
+            <div class="glass workout">
+
+                <h2>Today's Workout</h2>
+
+                {% if workout %}
+
+                    {% if workout.exercise_image %}
+
+                        <img src="{{ workout.exercise_image.url }}"
+                             alt="{{ workout.workout_name }}">
+
+                    {% endif %}
+
+                    <h3>{{ workout.workout_name }}</h3>
+
+                    <p>
+                        Category: {{ workout.workout_category }}
+                    </p>
+
+                    <div class="circle">
+
+                        {{ workout.completed_reps|default:"0" }}
+
+                        /
+
+                        {{ workout.target_reps|default:"0" }}
+
+                    </div>
+
+                    <p>
+
+                        {% if workout.is_completed %}
+
+                            <span style="color:#38e8a7;">
+                                ✅ Workout Completed
+                            </span>
+
+                        {% else %}
+
+                            <span style="color:#fbbf24;">
+                                ⏳ Workout In Progress
+                            </span>
+
+                        {% endif %}
+
+                    </p>
+
+                    <p>
+                        Form Status: {{ workout.form_status }}
+                    </p>
+
+                    <p>
+                        Duration: {{ workout.duration }} minutes
+                    </p>
+
+                {% else %}
+
+                    <p>No workout today.</p>
+
+                    <a href="{% url 'workout:workouts' %}"
+                       style="color:#c084fc; text-decoration:none;">
+
+                        Start a Workout →
+
+                    </a>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        <!-- BOTTOM SECTION -->
+
+        <div class="grid">
+
+            <!-- TODAY'S DIET -->
+
+            <div class="glass">
+
+                <h2>
+                    🍎 Today's Diet
+
+                    <span style="font-size:14px; color:#c084fc; font-weight:normal;">
+                        ({{ current_day_name }})
+                    </span>
+
+                </h2>
+
+                {% for meal in today_diet_meals %}
+
+                    <div style="margin-bottom:12px;">
+
+                        <span style="font-size:10px; color:#94a3b8;
+                                     text-transform:uppercase; font-weight:600;">
+
+                            {{ meal.meal|default:"Meal" }}
+
+                        </span>
+
+                        <p style="color:#f8fafc; font-size:13px;
+                                  font-weight:500; margin:4px 0;">
+
+                            🍽 {{ meal.food|default:"Food details unavailable" }}
+
+                        </p>
+
+                        <div style="display:flex; justify-content:space-between;
+                                    flex-wrap:wrap; gap:6px; font-size:11px;">
+
+                            <span style="color:#818cf8; font-weight:600;">
+                                🔥 {{ meal.calories|default:"0" }} kcal
+                            </span>
+
+                            <span style="color:#38e8a7; font-weight:600;">
+                                🥩 {{ meal.protein|default:"0" }}g protein
+                            </span>
+
+                            {% if meal.cost %}
+
+                                <span style="color:#4ade80; font-weight:700;
+                                             background:rgba(74,222,128,0.1);
+                                             padding:2px 6px; border-radius:6px;">
+
+                                    {{ meal.cost }}
+
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                    {% if not forloop.last %}
+
+                        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.08);
+                                   margin:10px 0;">
+
+                    {% endif %}
+
+                {% empty %}
+
+                    <p style="margin-bottom:15px; color:#94a3b8; font-size:13px;">
+                        No diet plan found for today.
+                    </p>
+
+                    <a href="{% url 'diet_dashboard' %}"
+                       style="text-decoration:none;">
+
+                        <button type="button"
+                                style="cursor:pointer; padding:8px 12px;
+                                       border-radius:8px; background:#6366f1;
+                                       color:white; border:none; font-size:12px;">
+
+                            View Diet Plan 🍎
+
+                        </button>
+
+                    </a>
+
+                {% endfor %}
+
+            </div>
+
+
+            <!-- DAILY PROGRESS -->
+
+            <div class="glass">
+
+                <h2>📊 Daily Progress</h2>
+
+                <p style="color:#94a3b8; font-size:12px; margin-bottom:15px;">
+                    Track your daily fitness activity
+                </p>
+
+
+                <!-- STEPS -->
+
+                <div style="margin-bottom:18px;">
+
+                    <div style="display:flex; justify-content:space-between;
+                                margin-bottom:7px; font-size:13px;">
+
+                        <span>👣 Steps</span>
+
+                        <strong>
+
+                            {{ daily_progress.steps|default:"0" }}
+
+                            /
+
+                            {{ daily_progress.steps_goal|default:"8000" }}
+
+                        </strong>
+
+                    </div>
+
+                    <div style="height:9px; background:rgba(255,255,255,0.1);
+                                border-radius:20px; overflow:hidden;">
+
+                        <div id="goalProgress"
+                             data-progress="{{ step_percentage|default:0 }}"
+                             style="height:100%; width:0%;
+                                    background-color:#38e8a7;
+                                    border-radius:20px;
+                                    transition:width 0.5s ease;">
+
+                        </div>
+
+                    </div>
+
+                    <p style="color:#94a3b8; font-size:11px; margin-top:5px;">
+
+                        {{ step_percentage|default:"0" }}% of your daily step goal
+
+                    </p>
+
+                </div>
+
+
+                <!-- ACTIVITY CALORIES -->
+
+                <div style="display:flex; justify-content:space-between;
+                            margin-bottom:14px; font-size:13px;">
+
+                    <span>🔥 Activity Calories</span>
+
+                    <strong>
+                        {{ daily_progress.activity_calories|default:"0" }} kcal
+                    </strong>
+
+                </div>
+
+
+                <!-- ACTIVE MINUTES -->
+
+                <div style="display:flex; justify-content:space-between;
+                            margin-bottom:14px; font-size:13px;">
+
+                    <span>❤️ Active Minutes</span>
+
+                    <strong>
+                        {{ daily_progress.active_minutes|default:"0" }} min
+                    </strong>
+
+                </div>
+
+
+                <!-- DISTANCE -->
+
+                <div style="display:flex; justify-content:space-between;
+                            margin-bottom:18px; font-size:13px;">
+
+                    <span>📍 Distance</span>
+
+                    <strong>
+                        {{ daily_progress.distance_km|default:"0" }} km
+                    </strong>
+
+                </div>
+
+
+                <a href="{% url 'progress:progress' %}"
+                   style="display:inline-block; color:#c084fc;
+                          text-decoration:none; font-size:13px;
+                          font-weight:600;">
+
+                    View Full Progress →
+
+                </a>
+
+            </div>
+
+
+            <!-- REMINDERS -->
+
+            <div class="glass">
+
+                <h2>🔔 Upcoming Reminders</h2>
+
+                <p style="color:#94a3b8; font-size:12px; margin-bottom:15px;">
+                    Your scheduled activities and meal reminders
+                </p>
+
+
+                {% for reminder in reminders %}
+
+                    {% if reminder.is_active %}
+
+                        <div class="dashboard-reminder"
+                             data-title="{{ reminder.title|escape }}"
+                             data-type="{{ reminder.reminder_type }}"
+                             data-meal="{{ reminder.meal_type|default:'' }}"
+                             data-time="{{ reminder.reminder_time|time:'H:i' }}"
+                             data-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
+                             data-repeat="{{ reminder.repeat }}"
+                             style="padding:10px; margin-bottom:10px;
+                                    background:rgba(255,255,255,0.05);
+                                    border-radius:10px;">
+
+                            <p style="margin:0; color:#f8fafc;">
+                                🔔 {{ reminder.title }}
+                            </p>
+
+                            <p style="margin:5px 0 0; color:#c084fc; font-size:12px;">
+                                ⏰ {{ reminder.reminder_time|time:'h:i A' }}
+                            </p>
+
+                            <p style="margin:5px 0 0; color:#94a3b8; font-size:11px;">
+                                {{ reminder.repeat }}
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+                {% empty %}
+
+                    <p style="color:#94a3b8;">
+                        No reminders available.
+                    </p>
+
+                {% endfor %}
+
+
+                <button type="button"
+                        onclick="enableReminderSound()"
+                        style="cursor:pointer; padding:9px 14px;
+                               background:#6366f1; color:white;
+                               border:none; border-radius:8px;
+                               font-weight:600; margin-top:10px;">
+
+                    🔊 Enable Reminder Sound
+
+                </button>
+
+
+                <div style="margin-top:15px;">
+
+                    <a href="{% url 'reminders:reminders' %}"
+                       style="color:#c084fc; text-decoration:none;
+                              font-size:13px; font-weight:600;">
+
+                        Manage All Reminders →
+
+                    </a>
+
+                </div>
+
+
+                <p id="reminderSoundStatus"
+                   style="color:#94a3b8; font-size:11px; margin-top:10px;">
+
+                    Sound is currently disabled.
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<!-- CUSTOM STYLES -->
+
+<style>
+
+.water-button {
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 10px;
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.water-button:hover {
+    opacity: 0.8;
+}
+
+
+/* LOGIN AND LOGOUT */
+
+.logout-item,
+.login-item {
+    list-style: none;
+    margin-top: 15px;
+    padding: 0;
+}
+
+.logout-item form {
+    width: 100%;
+    margin: 0;
+}
+
+.logout-btn,
+.login-item a {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 13px 16px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ffffff;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.logout-btn:hover,
+.login-item a:hover {
+    background: #dc3545;
+    color: white;
+}
+
+</style>
+
+
+<!-- DAILY PROGRESS BAR JAVASCRIPT -->
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const progressBar = document.getElementById("goalProgress");
+
+    if (progressBar) {
+
+        let percentage = parseFloat(
+            progressBar.getAttribute("data-progress")
+        );
+
+        if (isNaN(percentage)) {
+            percentage = 0;
+        }
+
+        percentage = Math.max(0, Math.min(percentage, 100));
+
+        progressBar.style.width = percentage + "%";
+
+    }
+
+});
+
+</script>
+
+
+<!-- REMINDER VOICE AND SOUND JAVASCRIPT -->
+
+<script>
+
+let reminderSoundEnabled = false;
+let reminderAudioContext = null;
+
+
+// ENABLE REMINDER SOUND
+
+function enableReminderSound() {
+
+    const AudioContext =
+        window.AudioContext || window.webkitAudioContext;
+
+    if (AudioContext && !reminderAudioContext) {
+        reminderAudioContext = new AudioContext();
+    }
+
+    if (reminderAudioContext &&
+        reminderAudioContext.state === "suspended") {
+
+        reminderAudioContext.resume();
+
+    }
+
+    reminderSoundEnabled = true;
+
+    document.getElementById(
+        "reminderSoundStatus"
+    ).innerText = "Reminder sound enabled successfully!";
+
+    speakReminder("FitAI reminders are now enabled.");
+
+}
+
+
+// PLAY BEEP SOUND
+
+function playReminderBeep() {
+
+    if (!reminderAudioContext) {
+        return;
+    }
+
+    const oscillator =
+        reminderAudioContext.createOscillator();
+
+    const gain =
+        reminderAudioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(reminderAudioContext.destination);
+
+    oscillator.frequency.value = 800;
+    gain.gain.value = 0.2;
+
+    oscillator.start();
+
+    oscillator.stop(
+        reminderAudioContext.currentTime + 0.5
+    );
+
+}
+
+
+// VOICE REMINDER
+
+function speakReminder(message) {
+
+    if (!reminderSoundEnabled) {
+        return;
+    }
+
+    if (!("speechSynthesis" in window)) {
+        playReminderBeep();
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const speech =
+        new SpeechSynthesisUtterance(message);
+
+    speech.lang = "en-IN";
+    speech.rate = 0.9;
+    speech.pitch = 1;
+
+    speech.onend = function () {
+        playReminderBeep();
+    };
+
+    speech.onerror = function () {
+        playReminderBeep();
+    };
+
+    window.speechSynthesis.speak(speech);
+
+}
+
+
+// CURRENT DATE
+
+function getCurrentDate() {
+
+    const now = new Date();
+
+    const year = now.getFullYear();
+
+    const month = String(
+        now.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+        now.getDate()
+    ).padStart(2, "0");
+
+    return year + "-" + month + "-" + day;
+
+}
+
+
+// CHECK REMINDERS
+
+function checkDashboardReminders() {
+
+    if (!reminderSoundEnabled) {
+        return;
+    }
+
+    const now = new Date();
+
+    const currentTime =
+        String(now.getHours()).padStart(2, "0") +
+        ":" +
+        String(now.getMinutes()).padStart(2, "0");
+
+    const currentDate = getCurrentDate();
+
+    const reminders = document.querySelectorAll(
+        ".dashboard-reminder"
+    );
+
+    reminders.forEach(function (reminder) {
+
+        const title = reminder.dataset.title;
+        const type = reminder.dataset.type;
+        const meal = reminder.dataset.meal;
+        const time = reminder.dataset.time;
+        const date = reminder.dataset.date;
+        const repeat = reminder.dataset.repeat;
+
+        let shouldRun = false;
+
+
+        // DAILY
+
+        if (repeat === "Daily") {
+
+            shouldRun = true;
+
+        }
+
+        // ONCE
+
+        else if (repeat === "Once") {
+
+            shouldRun = (date === currentDate);
+
+        }
+
+        // WEEKLY
+
+        else if (repeat === "Weekly") {
+
+            if (date) {
+
+                const reminderDate = new Date(
+                    date + "T12:00:00"
+                );
+
+                shouldRun =
+                    reminderDate.getDay() === now.getDay();
+
+            }
+
+        }
+
+
+        if (!shouldRun || time !== currentTime) {
+            return;
+        }
+
+
+        // PREVENT REPEATED ALERTS
+
+        const storageKey =
+            "fitai_dashboard_" +
+            currentDate +
+            "_" +
+            type +
+            "_" +
+            title;
+
+        if (localStorage.getItem(storageKey)) {
+            return;
+        }
+
+        localStorage.setItem(storageKey, "true");
+
+
+        // MEAL REMINDER
+
+        if (type === "Meal" && meal) {
+
+            speakReminder(
+                "It's time for " +
+                meal +
+                ". Please have your meal."
+            );
+
+        }
+
+        // OTHER REMINDERS
+
+        else {
+
+            speakReminder(
+                "Reminder! " + title
+            );
+
+        }
+
+    });
+
+}
+
+
+// CHECK EVERY 5 SECONDS
+
+setInterval(
+    checkDashboardReminders,
+    5000
+);
+
+</script>
+
+</body>
+</html>

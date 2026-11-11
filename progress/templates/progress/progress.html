@@ -1,0 +1,1357 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Progress - FitAI</title>
+
+    <style>
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #080b18;
+            color: #ffffff;
+            padding: 25px;
+        }
+
+        .progress-container {
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .page-header p {
+            color: #94a3b8;
+        }
+
+        .back-button {
+            text-decoration: none;
+            color: white;
+            background: #6366f1;
+            padding: 11px 18px;
+            border-radius: 9px;
+            font-size: 14px;
+        }
+
+        .progress-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card,
+        .section-card {
+            background: rgba(30, 24, 54, 0.75);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 18px;
+            padding: 22px;
+            min-width: 0;
+        }
+
+        .card h3 {
+            font-size: 15px;
+            color: #cbd5e1;
+            margin-bottom: 15px;
+        }
+
+        .card h2 {
+            font-size: 27px;
+            margin-bottom: 8px;
+        }
+
+        .card p {
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        .steps-card {
+            background: linear-gradient(
+                135deg,
+                rgba(99, 102, 241, 0.25),
+                rgba(30, 24, 54, 0.9)
+            );
+        }
+
+        .steps-number {
+            font-size: 38px;
+            font-weight: bold;
+            color: #38e8a7;
+            margin-bottom: 8px;
+        }
+
+        .goal-track {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 18px;
+        }
+
+        .goal-fill {
+            height: 100%;
+            width: 0%;
+            background: #38e8a7;
+            border-radius: 20px;
+            transition: width 0.5s ease;
+        }
+
+        .section-card {
+            border-radius: 22px;
+            padding: 28px;
+            margin-bottom: 25px;
+        }
+
+        .section-card h2 {
+            font-size: 25px;
+            margin-bottom: 12px;
+        }
+
+        .section-description {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .metric-box {
+            background: rgba(255,255,255,0.045);
+            padding: 20px;
+            border-radius: 14px;
+            min-width: 0;
+        }
+
+        .metric-box p {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .metric-box h2 {
+            font-size: 25px;
+            color: #ffffff;
+        }
+
+        .activity-chart-container {
+            position: relative;
+            width: 100%;
+            height: 340px;
+            margin-top: 20px;
+        }
+
+        .activity-chart-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .body-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .body-box {
+            background: rgba(255,255,255,0.045);
+            padding: 22px;
+            border-radius: 14px;
+        }
+
+        .body-box p {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .body-box h2 {
+            font-size: 26px;
+            color: #c084fc;
+        }
+
+        /* UPDATE FORMS */
+
+        .forms-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .form-box {
+            background: rgba(255,255,255,0.045);
+            padding: 22px;
+            border-radius: 14px;
+        }
+
+        .form-box h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .form-box label {
+            display: block;
+            color: #cbd5e1;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .form-box input {
+            width: 100%;
+            padding: 12px;
+            background: #11152a;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            margin-bottom: 14px;
+            outline: none;
+        }
+
+        .form-box button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #6366f1;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .form-box button:hover {
+            background: #4f46e5;
+        }
+
+        .form-message {
+            margin-top: 12px;
+            font-size: 13px;
+            min-height: 18px;
+        }
+
+        .success-message {
+            color: #38e8a7;
+        }
+
+        .error-message {
+            color: #fb7185;
+        }
+
+        .empty-chart {
+            color: #94a3b8;
+            text-align: center;
+            padding-top: 100px;
+        }
+
+        @media (max-width: 1000px) {
+
+            .progress-grid,
+            .metrics-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .forms-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 600px) {
+
+            body {
+                padding: 14px;
+            }
+
+            .page-header h1 {
+                font-size: 24px;
+            }
+
+            .progress-grid,
+            .metrics-grid,
+            .body-grid,
+            .forms-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-card {
+                padding: 18px;
+            }
+
+            .section-card h2 {
+                font-size: 20px;
+            }
+
+            .activity-chart-container {
+                height: 270px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="progress-container">
+
+    <!-- HEADER -->
+
+    <div class="page-header">
+
+        <div>
+            <h1>📊 My Fitness Progress</h1>
+            <p>Track your daily fitness journey with FitAI.</p>
+        </div>
+
+        <a href="{% url 'dashboard:home' %}" class="back-button">
+            ← Back to Dashboard
+        </a>
+
+    </div>
+
+
+    <!-- DAILY STEPS -->
+
+    <div class="progress-grid">
+
+        <div class="card steps-card">
+
+            <h3>👣 Daily Steps</h3>
+
+            <div class="steps-number" id="stepsValue">
+                {{ steps|default:"0" }}
+            </div>
+
+            <p>Steps completed today</p>
+
+            <div class="goal-track">
+
+                <div
+                    class="goal-fill"
+                    id="dailyGoalProgress"
+                    data-progress="{{ step_percentage|default:0 }}"
+                ></div>
+
+            </div>
+
+            <p style="margin-top: 12px;">
+                Goal: <span id="goalValue">{{ steps_goal|default:"8000" }}</span> steps
+            </p>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>📍 Distance</h3>
+
+            <h2><span id="distanceValue">{{ distance_km|default:"0" }}</span> km</h2>
+
+            <p>Estimated distance today</p>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>🔥 Activity Calories</h3>
+
+            <h2><span id="activityCaloriesValue">{{ activity_calories|default:"0" }}</span></h2>
+
+            <p>Estimated calories burned through activity</p>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>❤️ Active Minutes</h3>
+
+            <h2>{{ active_minutes|default:"0" }}</h2>
+
+            <p>Active minutes today</p>
+
+        </div>
+
+    </div>
+
+
+    <!-- TODAY'S ACTIVITY -->
+
+    <div class="section-card">
+
+        <h2>⚡ Today's Activity</h2>
+
+        <p class="section-description">
+            Your fitness activity summary for today.
+        </p>
+
+        <div class="metrics-grid">
+
+            <div class="metric-box">
+
+                <p>👣 Steps</p>
+
+                <h2 id="activitySteps">{{ steps|default:"0" }}</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>🏃 Distance</p>
+
+                <h2><span id="activityDistance">{{ distance_km|default:"0" }}</span> km</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>🔥 Calories Burned</p>
+
+                <h2>{{ calories_burned|default:"0" }}</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>💪 Workouts</p>
+
+                <h2>{{ workout_count|default:"0" }}</h2>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- NUTRITION -->
+
+    <div class="section-card">
+
+        <h2>🥗 Nutrition Progress</h2>
+
+        <p class="section-description">
+            Your daily food and nutrition summary.
+        </p>
+
+        <div class="metrics-grid">
+
+            <div class="metric-box">
+
+                <p>🔥 Calories Consumed</p>
+
+                <h2>{{ calories_consumed|default:"0" }}</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>🥩 Protein Consumed</p>
+
+                <h2>{{ protein_consumed|default:"0" }} g</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>💧 Water Intake</p>
+
+                <h2>{{ water_intake|default:"0" }} L</h2>
+
+            </div>
+
+            <div class="metric-box">
+
+                <p>🎯 Daily Step Goal</p>
+
+                <h2 id="nutritionGoalValue">{{ steps_goal|default:"8000" }}</h2>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- UPDATE PROGRESS -->
+
+    <div class="section-card">
+
+        <h2>✏️ Update Your Progress</h2>
+
+        <p class="section-description">
+            Manually update your steps, daily goal and body weight.
+        </p>
+
+        <div class="forms-grid">
+
+            <!-- UPDATE STEPS -->
+
+            <div class="form-box">
+
+                <h3>👣 Add Steps</h3>
+
+                <label for="manualSteps">Number of steps to add</label>
+
+                <input
+                    type="number"
+                    id="manualSteps"
+                    min="0"
+                    max="100000"
+                    placeholder="Example: 1000"
+                >
+
+                <button type="button" onclick="updateSteps()">
+                    Add Steps
+                </button>
+
+                <p id="stepsMessage" class="form-message"></p>
+
+            </div>
+
+
+            <!-- UPDATE GOAL -->
+
+            <div class="form-box">
+
+                <h3>🎯 Update Step Goal</h3>
+
+                <label for="newStepGoal">Daily step goal</label>
+
+                <input
+                    type="number"
+                    id="newStepGoal"
+                    min="1000"
+                    max="50000"
+                    value="{{ steps_goal|default:8000 }}"
+                >
+
+                <button type="button" onclick="updateGoal()">
+                    Save Goal
+                </button>
+
+                <p id="goalMessage" class="form-message"></p>
+
+            </div>
+
+
+            <!-- UPDATE WEIGHT -->
+
+            <div class="form-box">
+
+                <h3>⚖️ Update Weight</h3>
+
+                <label for="newWeight">Weight in kilograms</label>
+
+                <input
+                    type="number"
+                    id="newWeight"
+                    min="20"
+                    max="300"
+                    step="0.1"
+                    placeholder="Example: 65"
+                >
+
+                <button type="button" onclick="updateWeight()">
+                    Save Weight
+                </button>
+
+                <p id="weightMessage" class="form-message"></p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- LAST 7 DAYS ACTIVITY -->
+
+    <div class="section-card">
+
+        <h2>📊 Last 7 Days Activity</h2>
+
+        <p class="section-description">
+            Daily step count.
+        </p>
+
+        <div class="activity-chart-container">
+
+            <canvas id="weeklyChart"></canvas>
+
+            <p id="chartEmptyMessage" class="empty-chart" style="display:none;">
+                No activity data available yet.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- BODY PROGRESS -->
+
+    <div class="section-card">
+
+        <h2>⚖️ Body Progress</h2>
+
+        <p class="section-description">
+            Track your body measurements and BMI.
+        </p>
+
+        <div class="body-grid">
+
+            <div class="body-box">
+
+                <p>⚖️ Body Weight</p>
+
+                <h2 id="bodyWeightValue">
+
+                    {% if daily_progress.weight_kg %}
+                        {{ daily_progress.weight_kg }} kg
+                    {% elif weight %}
+                        {{ weight }} kg
+                    {% else %}
+                        Not added
+                    {% endif %}
+
+                </h2>
+
+            </div>
+
+
+            <div class="body-box">
+
+                <p>📏 Height</p>
+
+                <h2>
+                    {% if height %}
+                        {{ height }} cm
+                    {% else %}
+                        Not added
+                    {% endif %}
+                </h2>
+
+            </div>
+
+
+            <div class="body-box">
+
+                <p>📊 BMI</p>
+
+                <h2 id="bmiValue">
+
+                    {% if bmi %}
+                        {{ bmi }}
+                    {% else %}
+                        Not available
+                    {% endif %}
+
+                </h2>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- WEIGHT HISTORY -->
+
+    <div class="section-card">
+
+        <h2>📈 Weight History</h2>
+
+        <p class="section-description">
+            Track your saved body weight over the last 30 days.
+        </p>
+
+        <div class="activity-chart-container">
+
+            <canvas id="weightChart"></canvas>
+
+            <p id="weightEmptyMessage" class="empty-chart" style="display:none;">
+                No weight history available yet.
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- DJANGO DATA -->
+
+{{ weekly_progress|json_script:"weekly-progress-data" }}
+
+{{ weight_data|json_script:"weight-progress-data" }}
+
+<!-- CSRF -->
+
+{% csrf_token %}
+
+<!-- CHART.JS -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<script>
+
+    // =========================================
+    // CSRF TOKEN
+    // =========================================
+
+    function getCSRFToken() {
+
+        const csrfInput = document.querySelector(
+            '[name=csrfmiddlewaretoken]'
+        );
+
+        if (csrfInput) {
+            return csrfInput.value;
+        }
+
+        return "";
+
+    }
+
+
+    // =========================================
+    // SHOW MESSAGE
+    // =========================================
+
+    function showMessage(elementId, message, success) {
+
+        const element = document.getElementById(elementId);
+
+        element.innerText = message;
+
+        element.className = success
+            ? "form-message success-message"
+            : "form-message error-message";
+
+    }
+
+
+    // =========================================
+    // SEND POST REQUEST
+    // =========================================
+
+    async function sendRequest(url, data) {
+
+        const response = await fetch(url, {
+
+            method: "POST",
+
+            headers: {
+
+                "Content-Type": "application/json",
+
+                "X-CSRFToken": getCSRFToken()
+
+            },
+
+            body: JSON.stringify(data)
+
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+
+            throw new Error(
+                result.message || result.error || "Request failed."
+            );
+
+        }
+
+        return result;
+
+    }
+
+
+    // =========================================
+    // UPDATE STEP PROGRESS UI
+    // =========================================
+
+    function updateStepDisplay(steps, goal, percentage, distance, calories) {
+
+        document.getElementById("stepsValue").innerText = steps;
+
+        document.getElementById("activitySteps").innerText = steps;
+
+        document.getElementById("goalValue").innerText = goal;
+
+        document.getElementById("nutritionGoalValue").innerText = goal;
+
+        document.getElementById("distanceValue").innerText = distance;
+
+        document.getElementById("activityDistance").innerText = distance;
+
+        document.getElementById("activityCaloriesValue").innerText = calories;
+
+        const progressBar = document.getElementById("dailyGoalProgress");
+
+        progressBar.style.width = percentage + "%";
+
+        progressBar.setAttribute("data-progress", percentage);
+
+    }
+
+
+    // =========================================
+    // ADD MANUAL STEPS
+    // =========================================
+
+    async function updateSteps() {
+
+        const input = document.getElementById("manualSteps");
+
+        const steps = Number(input.value);
+
+        if (!Number.isInteger(steps) || steps < 0 || steps > 100000) {
+
+            showMessage(
+                "stepsMessage",
+                "Enter a valid step count between 0 and 100,000.",
+                false
+            );
+
+            return;
+
+        }
+
+        try {
+
+            const result = await sendRequest(
+
+                "{% url 'progress:update_steps' %}",
+
+                {
+                    steps_increment: steps
+                }
+
+            );
+
+            const percentage = Math.min(
+                100,
+                Math.round(
+                    (result.steps / result.goal) * 100
+                )
+            );
+
+            updateStepDisplay(
+                result.steps,
+                result.goal,
+                percentage,
+                result.distance,
+                result.calories
+            );
+
+            input.value = "";
+
+            showMessage(
+                "stepsMessage",
+                "Steps updated successfully!",
+                true
+            );
+
+        } catch (error) {
+
+            showMessage(
+                "stepsMessage",
+                error.message,
+                false
+            );
+
+        }
+
+    }
+
+
+    // =========================================
+    // UPDATE DAILY GOAL
+    // =========================================
+
+    async function updateGoal() {
+
+        const input = document.getElementById("newStepGoal");
+
+        const goal = Number(input.value);
+
+        if (!Number.isInteger(goal) || goal < 1000 || goal > 50000) {
+
+            showMessage(
+                "goalMessage",
+                "Goal must be between 1,000 and 50,000.",
+                false
+            );
+
+            return;
+
+        }
+
+        try {
+
+            const result = await sendRequest(
+
+                "{% url 'progress:update_step_goal' %}",
+
+                {
+                    goal: goal
+                }
+
+            );
+
+            const percentage = result.step_percentage;
+
+            updateStepDisplay(
+                result.steps,
+                result.goal,
+                percentage,
+                document.getElementById("distanceValue").innerText,
+                document.getElementById("activityCaloriesValue").innerText
+            );
+
+            input.value = result.goal;
+
+            showMessage(
+                "goalMessage",
+                "Daily goal updated successfully!",
+                true
+            );
+
+        } catch (error) {
+
+            showMessage(
+                "goalMessage",
+                error.message,
+                false
+            );
+
+        }
+
+    }
+
+
+    // =========================================
+    // UPDATE WEIGHT
+    // =========================================
+
+    async function updateWeight() {
+
+        const input = document.getElementById("newWeight");
+
+        const weight = Number(input.value);
+
+        if (!Number.isFinite(weight) || weight < 20 || weight > 300) {
+
+            showMessage(
+                "weightMessage",
+                "Enter a valid weight between 20 and 300 kg.",
+                false
+            );
+
+            return;
+
+        }
+
+        try {
+
+            const result = await sendRequest(
+
+                "{% url 'progress:update_weight' %}",
+
+                {
+                    weight: weight
+                }
+
+            );
+
+            document.getElementById("bodyWeightValue").innerText =
+                result.weight + " kg";
+
+            input.value = "";
+
+            showMessage(
+                "weightMessage",
+                "Weight saved successfully!",
+                true
+            );
+
+            // Refresh so the updated weight appears in history.
+
+            setTimeout(function () {
+
+                window.location.reload();
+
+            }, 1000);
+
+        } catch (error) {
+
+            showMessage(
+                "weightMessage",
+                error.message,
+                false
+            );
+
+        }
+
+    }
+
+
+    // =========================================
+    // LOAD CHART DATA
+    // =========================================
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // DAILY GOAL BAR
+
+        const goalBar = document.getElementById(
+            "dailyGoalProgress"
+        );
+
+        if (goalBar) {
+
+            let percentage = Number(
+                goalBar.getAttribute("data-progress")
+            );
+
+            if (!Number.isFinite(percentage)) {
+                percentage = 0;
+            }
+
+            percentage = Math.max(
+                0,
+                Math.min(100, percentage)
+            );
+
+            goalBar.style.width = percentage + "%";
+
+        }
+
+
+        if (typeof Chart === "undefined") {
+
+            document.getElementById(
+                "chartEmptyMessage"
+            ).innerText = "Chart library could not be loaded.";
+
+            document.getElementById(
+                "chartEmptyMessage"
+            ).style.display = "block";
+
+            return;
+
+        }
+
+
+        // =====================================
+        // WEEKLY ACTIVITY CHART
+        // =====================================
+
+        const weeklyElement = document.getElementById(
+            "weekly-progress-data"
+        );
+
+        let weeklyData = [];
+
+        try {
+
+            weeklyData = JSON.parse(
+                weeklyElement.textContent
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+        }
+
+        if (!Array.isArray(weeklyData)) {
+            weeklyData = [];
+        }
+
+        const weeklyLabels = [];
+
+        const weeklySteps = [];
+
+        weeklyData.forEach(function (item) {
+
+            weeklyLabels.push(item.date);
+
+            weeklySteps.push(Number(item.steps) || 0);
+
+        });
+
+        if (weeklyData.length === 0) {
+
+            document.getElementById(
+                "weeklyChart"
+            ).style.display = "none";
+
+            document.getElementById(
+                "chartEmptyMessage"
+            ).style.display = "block";
+
+        } else {
+
+            new Chart(
+                document.getElementById("weeklyChart"),
+                {
+
+                    type: "bar",
+
+                    data: {
+
+                        labels: weeklyLabels,
+
+                        datasets: [{
+
+                            label: "Daily Steps",
+
+                            data: weeklySteps,
+
+                            backgroundColor: "rgba(56,232,167,0.75)",
+
+                            borderColor: "#38e8a7",
+
+                            borderWidth: 1,
+
+                            borderRadius: 8,
+
+                            maxBarThickness: 55
+
+                        }]
+
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false,
+
+                        plugins: {
+
+                            legend: {
+
+                                labels: {
+                                    color: "#cbd5e1"
+                                }
+
+                            }
+
+                        },
+
+                        scales: {
+
+                            x: {
+
+                                grid: {
+                                    display: false
+                                },
+
+                                ticks: {
+                                    color: "#cbd5e1"
+                                }
+
+                            },
+
+                            y: {
+
+                                beginAtZero: true,
+
+                                ticks: {
+                                    color: "#94a3b8",
+                                    precision: 0
+                                },
+
+                                grid: {
+                                    color: "rgba(255,255,255,0.08)"
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+        }
+
+
+        // =====================================
+        // WEIGHT HISTORY CHART
+        // =====================================
+
+        const weightElement = document.getElementById(
+            "weight-progress-data"
+        );
+
+        let weightData = [];
+
+        try {
+
+            weightData = JSON.parse(
+                weightElement.textContent
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+        }
+
+        if (!Array.isArray(weightData)) {
+            weightData = [];
+        }
+
+        const weightLabels = [];
+
+        const weightValues = [];
+
+        weightData.forEach(function (item) {
+
+            weightLabels.push(item.date);
+
+            weightValues.push(Number(item.weight));
+
+        });
+
+        if (weightData.length === 0) {
+
+            document.getElementById(
+                "weightChart"
+            ).style.display = "none";
+
+            document.getElementById(
+                "weightEmptyMessage"
+            ).style.display = "block";
+
+        } else {
+
+            new Chart(
+                document.getElementById("weightChart"),
+                {
+
+                    type: "line",
+
+                    data: {
+
+                        labels: weightLabels,
+
+                        datasets: [{
+
+                            label: "Body Weight (kg)",
+
+                            data: weightValues,
+
+                            borderColor: "#c084fc",
+
+                            backgroundColor: "rgba(192,132,252,0.15)",
+
+                            fill: true,
+
+                            tension: 0.3,
+
+                            pointRadius: 5
+
+                        }]
+
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false,
+
+                        plugins: {
+
+                            legend: {
+
+                                labels: {
+                                    color: "#cbd5e1"
+                                }
+
+                            }
+
+                        },
+
+                        scales: {
+
+                            x: {
+
+                                ticks: {
+                                    color: "#cbd5e1"
+                                },
+
+                                grid: {
+                                    display: false
+                                }
+
+                            },
+
+                            y: {
+
+                                ticks: {
+                                    color: "#94a3b8"
+                                },
+
+                                grid: {
+                                    color: "rgba(255,255,255,0.08)"
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+        }
+
+    });
+
+</script>
+
+</body>
+</html>

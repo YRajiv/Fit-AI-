@@ -1,0 +1,1119 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FitAI Assistant</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #080d27;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* SIDEBAR */
+
+        .sidebar {
+            width: 300px;
+            min-width: 250px;
+            background: #261b4d;
+            padding: 30px 25px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #403568;
+        }
+
+        .brand {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .tagline {
+            color: #c5b9ef;
+            margin-bottom: 45px;
+        }
+
+        .nav a {
+            display: block;
+            text-decoration: none;
+            color: white;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            font-size: 17px;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            background: linear-gradient(90deg, #7049f4, #3976f8);
+        }
+
+        .user {
+            margin-top: auto;
+            color: #d5caff;
+            padding: 15px 0;
+        }
+
+        /* MAIN */
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            background: #090e2b;
+        }
+
+        /* HEADER */
+
+        .header {
+            height: 110px;
+            padding: 20px 35px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #171832;
+            border-bottom: 1px solid #303052;
+        }
+
+        .assistant-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .bot-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #7049f4, #3976f8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .assistant-info h2 {
+            font-size: 23px;
+            margin-bottom: 7px;
+        }
+
+        .online {
+            color: #a9a9c5;
+            font-size: 14px;
+        }
+
+        .clear-btn {
+            background: #292d46;
+            color: white;
+            border: 1px solid #454967;
+            border-radius: 12px;
+            padding: 14px 20px;
+            cursor: pointer;
+        }
+
+        .clear-btn:hover {
+            background: #414666;
+        }
+
+        /* CHAT AREA */
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 35px;
+        }
+
+        .messages {
+            max-width: 1050px;
+            margin: auto;
+        }
+
+        .message-row {
+            display: flex;
+            margin-bottom: 25px;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .message-row.user-row {
+            justify-content: flex-end;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 18px 22px;
+            border-radius: 20px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #7049f4, #3976f8);
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message {
+            background: #202442;
+            border: 1px solid #35395b;
+            border-bottom-left-radius: 5px;
+        }
+
+        .avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #302a57;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .time {
+            display: block;
+            font-size: 11px;
+            text-align: right;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+
+        /* THINKING */
+
+        .thinking {
+            display: none;
+            color: #b9a5ff;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .thinking.show {
+            display: block;
+        }
+
+        .dots {
+            display: inline-flex;
+            gap: 5px;
+            margin-right: 10px;
+        }
+
+        .dots span {
+            width: 8px;
+            height: 8px;
+            background: #9b7cff;
+            border-radius: 50%;
+            animation: bounce 0.8s infinite alternate;
+        }
+
+        .dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            from {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(-6px);
+            }
+        }
+
+        /* INPUT */
+
+        .bottom {
+            padding: 22px 35px;
+            background: #171832;
+            border-top: 1px solid #303052;
+        }
+
+        .input-box {
+            max-width: 1050px;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            background: #292d46;
+            border: 1px solid #55517e;
+            border-radius: 20px;
+            padding: 12px 15px;
+        }
+
+        .input-box textarea {
+            flex: 1;
+            resize: none;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: white;
+            font-size: 16px;
+            padding: 10px;
+            max-height: 120px;
+            font-family: inherit;
+        }
+
+        .input-box textarea::placeholder {
+            color: #aaa5c1;
+        }
+
+        .send-btn {
+            width: 52px;
+            height: 52px;
+            border: none;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #7049f4, #3976f8);
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .disclaimer {
+            text-align: center;
+            color: #9695bd;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        .quick-prompts {
+            max-width: 1050px;
+            margin: 0 auto 12px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-prompts button {
+            background: #242747;
+            color: #ddd7ff;
+            border: 1px solid #45436c;
+            padding: 9px 13px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .quick-prompts button:hover {
+            background: #40366e;
+        }
+
+        @media (max-width: 750px) {
+            .sidebar {
+                display: none;
+            }
+
+            .header {
+                padding: 15px;
+            }
+
+            .chat-area {
+                padding: 18px;
+            }
+
+            .bottom {
+                padding: 15px;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+        <div class="brand">🏋️ FitAI</div>
+
+        <div class="tagline">Stronger Every Day</div>
+
+        <nav class="nav">
+
+            <a href="/dashboard/">🏠 Dashboard</a>
+
+            <a href="/nutrition/">🥗 Nutrition</a>
+
+            <a href="/workout/">💪 Workout</a>
+
+            <a href="/posture/">🤖 AI Posture Check</a>
+
+            <a href="{% url 'chatbot:chat' %}" class="active">
+                💬 Chat Assistant
+            </a>
+
+            <a href="/diet/">🍎 Diet Plan</a>
+
+            <a href="/progress/">📊 Progress</a>
+
+        </nav>
+
+        <div class="user">
+            👤 {{ request.user.username }}
+            <br>
+            <small>FitAI Member</small>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+
+    <main class="main">
+
+        <!-- HEADER -->
+
+        <header class="header">
+
+            <div class="assistant-info">
+
+                <div class="bot-icon">🤖</div>
+
+                <div>
+                    <h2>FitAI Assistant</h2>
+
+                    <div class="online">
+                        🟢 Your Personal AI Fitness Coach
+                    </div>
+                </div>
+
+            </div>
+
+            <button class="clear-btn" id="clearChat">
+                🗑 Clear Chat
+            </button>
+
+        </header>
+
+
+        <!-- CHAT MESSAGES -->
+
+        <section class="chat-area" id="chatArea">
+
+            <div class="messages" id="messages">
+
+                <div class="message-row">
+
+                    <div class="avatar">🤖</div>
+
+                    <div class="message bot-message">
+                        Hello! Welcome to FitAI.
+
+                        I can help you with workouts, nutrition,
+                        protein, calories, muscle building and fitness.
+
+                        What would you like to know?
+                    </div>
+
+                </div>
+
+                <div class="thinking" id="thinking">
+
+                    <span class="dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+
+                    FitAI is thinking...
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- INPUT AREA -->
+
+        <footer class="bottom">
+
+            <div class="quick-prompts">
+
+                <button type="button" data-prompt="How much protein is in one egg?">
+                    🥚 Protein in egg
+                </button>
+
+                <button type="button" data-prompt="Suggest a beginner workout plan.">
+                    💪 Workout plan
+                </button>
+
+                <button type="button" data-prompt="Explain BMI and its categories.">
+                    📊 Analyze BMI
+                </button>
+
+                <button type="button" data-prompt="Suggest a balanced Indian diet.">
+                    🥗 Diet suggestions
+                </button>
+
+            </div>
+
+
+            <form id="chatForm">
+
+                {% csrf_token %}
+
+                <div class="input-box">
+
+                    <textarea
+                        id="userInput"
+                        rows="1"
+                        placeholder="Ask FitAI anything about fitness..."
+                        required
+                    ></textarea>
+
+                    <button
+                        type="submit"
+                        class="send-btn"
+                        id="sendBtn"
+                    >
+                        ➤
+                    </button>
+
+                </div>
+
+            </form>
+
+            <div class="disclaimer">
+                AI-generated fitness guidance. Verify important health
+                decisions with a qualified professional.
+            </div>
+
+        </footer>
+
+    </main>
+
+</div>
+
+
+<script>
+
+    // =====================================================
+    // ELEMENTS
+    // =====================================================
+
+    const chatForm = document.getElementById("chatForm");
+
+    const userInput = document.getElementById("userInput");
+
+    const messages = document.getElementById("messages");
+
+    const chatArea = document.getElementById("chatArea");
+
+    const thinking = document.getElementById("thinking");
+
+    const sendBtn = document.getElementById("sendBtn");
+
+    const clearBtn = document.getElementById("clearChat");
+
+
+    // =====================================================
+    // URLS
+    // =====================================================
+
+    const SEND_URL = "{% url 'chatbot:send_message' %}";
+
+    const CLEAR_URL = "{% url 'chatbot:clear_chat' %}";
+
+
+    // =====================================================
+    // CSRF TOKEN
+    // =====================================================
+
+    const csrfToken = document.querySelector(
+        '[name=csrfmiddlewaretoken]'
+    ).value;
+
+
+    // =====================================================
+    // CHAT HISTORY
+    // =====================================================
+
+    let chatHistory = [];
+
+    try {
+
+        chatHistory = JSON.parse(
+            localStorage.getItem("fitai_chat_history") || "[]"
+        );
+
+        if (!Array.isArray(chatHistory)) {
+            chatHistory = [];
+        }
+
+    } catch (error) {
+
+        chatHistory = [];
+
+    }
+
+
+    // =====================================================
+    // SAVE HISTORY
+    // =====================================================
+
+    function saveHistory() {
+
+        localStorage.setItem(
+            "fitai_chat_history",
+            JSON.stringify(chatHistory.slice(-12))
+        );
+
+    }
+
+
+    // =====================================================
+    // CURRENT TIME
+    // =====================================================
+
+    function getTime() {
+
+        return new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+
+    }
+
+
+    // =====================================================
+    // SCROLL TO BOTTOM
+    // =====================================================
+
+    function scrollToBottom() {
+
+        chatArea.scrollTop = chatArea.scrollHeight;
+
+    }
+
+
+    // =====================================================
+    // ADD MESSAGE
+    // =====================================================
+
+    function addMessage(text, sender) {
+
+        const row = document.createElement("div");
+
+        row.className = "message-row";
+
+        if (sender === "user") {
+            row.classList.add("user-row");
+        }
+
+        if (sender === "assistant") {
+
+            const avatar = document.createElement("div");
+
+            avatar.className = "avatar";
+
+            avatar.textContent = "🤖";
+
+            row.appendChild(avatar);
+
+        }
+
+        const bubble = document.createElement("div");
+
+        bubble.className = "message";
+
+        if (sender === "user") {
+            bubble.classList.add("user-message");
+        } else {
+            bubble.classList.add("bot-message");
+        }
+
+        // textContent prevents HTML/script injection
+        bubble.textContent = text;
+
+        const time = document.createElement("span");
+
+        time.className = "time";
+
+        time.textContent = getTime();
+
+        bubble.appendChild(time);
+
+        row.appendChild(bubble);
+
+        messages.insertBefore(row, thinking);
+
+        scrollToBottom();
+
+        return bubble;
+
+    }
+
+
+    // =====================================================
+    // LOAD OLD CHAT
+    // =====================================================
+
+    function loadHistory() {
+
+        chatHistory.forEach(function(item) {
+
+            if (
+                item &&
+                (item.role === "user" || item.role === "assistant") &&
+                typeof item.content === "string"
+            ) {
+
+                addMessage(item.content, item.role);
+
+            }
+
+        });
+
+    }
+
+    loadHistory();
+
+
+    // =====================================================
+    // SHOW THINKING
+    // =====================================================
+
+    function showThinking() {
+
+        thinking.classList.add("show");
+
+        scrollToBottom();
+
+    }
+
+
+    // =====================================================
+    // HIDE THINKING
+    // =====================================================
+
+    function hideThinking() {
+
+        thinking.classList.remove("show");
+
+    }
+
+
+    // =====================================================
+    // SEND MESSAGE
+    // =====================================================
+
+    async function sendMessage(message) {
+
+        message = message.trim();
+
+        if (!message) {
+            return;
+        }
+
+        if (sendBtn.disabled) {
+            return;
+        }
+
+        // Keep previous history for this request
+        const previousHistory = chatHistory.slice(-12);
+
+        addMessage(message, "user");
+
+        chatHistory.push({
+            role: "user",
+            content: message
+        });
+
+        saveHistory();
+
+        userInput.value = "";
+
+        sendBtn.disabled = true;
+
+        showThinking();
+
+        let assistantBubble = null;
+
+        let assistantText = "";
+
+        let streamError = false;
+
+        // Stop waiting after 90 seconds
+        const controller = new AbortController();
+
+        const timeoutId = setTimeout(function() {
+
+            controller.abort();
+
+        }, 90000);
+
+
+        try {
+
+            const response = await fetch(SEND_URL, {
+
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type": "application/json",
+
+                    "X-CSRFToken": csrfToken
+
+                },
+
+                body: JSON.stringify({
+
+                    message: message,
+
+                    history: previousHistory
+
+                }),
+
+                signal: controller.signal
+
+            });
+
+
+            if (!response.ok) {
+
+                let errorMessage = "Unable to contact FitAI.";
+
+                try {
+
+                    const errorData = await response.json();
+
+                    errorMessage = errorData.error || errorMessage;
+
+                } catch (error) {
+
+                    // Keep default message
+                }
+
+                throw new Error(errorMessage);
+
+            }
+
+
+            if (!response.body) {
+
+                throw new Error(
+                    "Your browser does not support response streaming."
+                );
+
+            }
+
+
+            const reader = response.body.getReader();
+
+            const decoder = new TextDecoder();
+
+            let buffer = "";
+
+
+            // Read chunks as they arrive
+            while (true) {
+
+                const result = await reader.read();
+
+                if (result.done) {
+                    break;
+                }
+
+                buffer += decoder.decode(
+                    result.value,
+                    { stream: true }
+                );
+
+                const events = buffer.split("\n\n");
+
+                buffer = events.pop();
+
+
+                for (const event of events) {
+
+                    const line = event
+                        .split("\n")
+                        .find(function(part) {
+                            return part.startsWith("data: ");
+                        });
+
+                    if (!line) {
+                        continue;
+                    }
+
+                    const jsonText = line.substring(6);
+
+                    let data;
+
+                    try {
+
+                        data = JSON.parse(jsonText);
+
+                    } catch (error) {
+
+                        continue;
+
+                    }
+
+
+                    if (data.type === "text") {
+
+                        if (!assistantBubble) {
+
+                            hideThinking();
+
+                            assistantBubble = addMessage(
+                                "",
+                                "assistant"
+                            );
+
+                        }
+
+                        assistantText += data.text;
+
+                        // Keep the message safe as plain text
+                        assistantBubble.textContent = assistantText;
+
+                        scrollToBottom();
+
+                    }
+
+
+                    if (data.type === "error") {
+
+                        streamError = true;
+
+                        hideThinking();
+
+                        addMessage(
+                            data.message,
+                            "assistant"
+                        );
+
+                    }
+
+
+                    if (data.type === "done") {
+
+                        hideThinking();
+
+                    }
+
+                }
+
+            }
+
+
+            // Flush remaining decoder data
+            buffer += decoder.decode();
+
+            if (!assistantText && !streamError) {
+
+                hideThinking();
+
+                addMessage(
+                    "FitAI returned an empty response. Please try again.",
+                    "assistant"
+                );
+
+            }
+
+            if (assistantText) {
+
+                chatHistory.push({
+
+                    role: "assistant",
+
+                    content: assistantText
+
+                });
+
+                chatHistory = chatHistory.slice(-12);
+
+                saveHistory();
+
+            }
+
+        } catch (error) {
+
+            hideThinking();
+
+            if (error.name === "AbortError") {
+
+                addMessage(
+                    "The request took too long. Please try again.",
+                    "assistant"
+                );
+
+            } else {
+
+                addMessage(
+                    error.message || "Something went wrong. Please try again.",
+                    "assistant"
+                );
+
+            }
+
+        } finally {
+
+            clearTimeout(timeoutId);
+
+            hideThinking();
+
+            sendBtn.disabled = false;
+
+            userInput.focus();
+
+        }
+
+    }
+
+
+    // =====================================================
+    // FORM SUBMIT
+    // =====================================================
+
+    chatForm.addEventListener("submit", function(event) {
+
+        event.preventDefault();
+
+        sendMessage(userInput.value);
+
+    });
+
+
+    // =====================================================
+    // ENTER TO SEND
+    // SHIFT + ENTER FOR NEW LINE
+    // =====================================================
+
+    userInput.addEventListener("keydown", function(event) {
+
+        if (
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
+
+            event.preventDefault();
+
+            chatForm.requestSubmit();
+
+        }
+
+    });
+
+
+    // =====================================================
+    // QUICK PROMPTS
+    // =====================================================
+
+    document.querySelectorAll("[data-prompt]").forEach(function(button) {
+
+        button.addEventListener("click", function() {
+
+            sendMessage(button.dataset.prompt);
+
+        });
+
+    });
+
+
+    // =====================================================
+    // CLEAR CHAT
+    // =====================================================
+
+    clearBtn.addEventListener("click", async function() {
+
+        if (!confirm("Do you want to clear this conversation?")) {
+            return;
+        }
+
+        if (sendBtn.disabled) {
+            return;
+        }
+
+        try {
+
+            await fetch(CLEAR_URL, {
+
+                method: "POST",
+
+                headers: {
+                    "X-CSRFToken": csrfToken
+                }
+
+            });
+
+        } catch (error) {
+
+            console.log("Clear chat request failed:", error);
+
+        }
+
+        chatHistory = [];
+
+        localStorage.removeItem("fitai_chat_history");
+
+        // Remove all messages except the initial welcome message
+        messages.innerHTML = `
+            <div class="message-row">
+                <div class="avatar">🤖</div>
+                <div class="message bot-message">
+                    Hello! Welcome to FitAI.
+
+                    I can help you with workouts, nutrition,
+                    protein, calories, muscle building and fitness.
+
+                    What would you like to know?
+                </div>
+            </div>
+            <div class="thinking" id="thinking">
+                <span class="dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+                FitAI is thinking...
+            </div>
+        `;
+
+        // Restore reference after replacing HTML
+        window.location.reload();
+
+    });
+
+</script>
+
+</body>
+</html>

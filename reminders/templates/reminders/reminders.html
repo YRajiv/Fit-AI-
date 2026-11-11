@@ -1,0 +1,784 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meal Reminders - FitAI</title>
+
+    <style>
+        :root {
+            --bg: #0f0c1b;
+            --card: rgba(30, 24, 54, 0.75);
+            --purple: #8b5cf6;
+            --purple-light: #a78bfa;
+            --text: #ffffff;
+            --muted: #b8b3c9;
+            --border: rgba(139, 92, 246, 0.25);
+            --green: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 30px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .header {
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 17px;
+            padding: 25px;
+            margin-bottom: 22px;
+            backdrop-filter: blur(15px);
+        }
+
+        .card h2 {
+            font-size: 21px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            padding: 13px;
+            border-radius: 9px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #86efac;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        .sound-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .sound-section p {
+            color: var(--muted);
+            font-size: 14px;
+            margin-top: 7px;
+        }
+
+        .sound-btn,
+        .save-btn {
+            border: none;
+            border-radius: 9px;
+            padding: 13px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .sound-btn {
+            background: var(--purple);
+            color: white;
+        }
+
+        .sound-btn:hover {
+            background: #7545df;
+        }
+
+        .sound-status {
+            color: var(--green);
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .reminder-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .reminder-item {
+            background: rgba(139, 92, 246, 0.09);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 13px;
+        }
+
+        .reminder-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 17px;
+        }
+
+        .meal-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--purple-light);
+        }
+
+        .meal-icon {
+            font-size: 25px;
+        }
+
+        .reminder-item label {
+            display: block;
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .reminder-item input[type="time"] {
+            width: 100%;
+            padding: 12px;
+            background: #211b36;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .toggle-row input {
+            width: 17px;
+            height: 17px;
+            accent-color: var(--purple);
+        }
+
+        .food-details {
+            margin-top: 14px;
+            padding: 13px;
+            border-radius: 9px;
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .food-details strong {
+            display: block;
+            margin-bottom: 7px;
+            color: white;
+        }
+
+        .food-details p {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .save-section {
+            margin-top: 22px;
+            text-align: right;
+        }
+
+        .save-btn {
+            background: var(--purple);
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #7545df;
+        }
+
+        .empty {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .current-time {
+            color: var(--purple-light);
+            font-weight: bold;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 17px;
+            }
+
+            .reminder-list {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                padding: 19px;
+            }
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- PAGE HEADER -->
+
+    <div class="header">
+
+        <h1>Meal Reminders</h1>
+
+        <p>
+            Never miss your meals. Set your meal timings and receive
+            voice reminders according to your daily diet plan.
+        </p>
+
+        <div class="current-time">
+            Today's Diet: {{ today_name }}
+        </div>
+
+    </div>
+
+
+    <!-- DJANGO MESSAGES -->
+
+    {% if messages %}
+
+        {% for message in messages %}
+
+            <div class="message
+                {% if message.tags == 'success' %}
+                    success
+                {% else %}
+                    error
+                {% endif %}">
+
+                {{ message }}
+
+            </div>
+
+        {% endfor %}
+
+    {% endif %}
+
+
+    <!-- SOUND SETTINGS -->
+
+    <div class="card">
+
+        <div class="sound-section">
+
+            <div>
+
+                <h2>Voice Reminder Settings</h2>
+
+                <p>
+                    Enable sound to hear reminders when your meal time arrives.
+                </p>
+
+                <div class="sound-status" id="soundStatus">
+                    Sound is currently disabled.
+                </div>
+
+            </div>
+
+            <button
+                type="button"
+                class="sound-btn"
+                id="soundButton">
+
+                Enable Sound
+
+            </button>
+
+        </div>
+
+        <p id="notificationStatus"
+           style="color:var(--muted);font-size:12px;margin-top:14px;">
+            Browser notifications can also be enabled.
+        </p>
+
+        <div class="current-time" id="liveClock"></div>
+
+    </div>
+
+
+    <!-- MEAL REMINDER SETTINGS -->
+
+    <div class="card">
+
+        <h2>Daily Meal Schedule</h2>
+
+        <p style="color:var(--muted);margin-bottom:20px;line-height:1.6;">
+
+            Change your meal times and enable or disable individual reminders.
+
+        </p>
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            <div class="reminder-list">
+
+                {% for reminder in reminders %}
+
+                <div
+                    class="reminder-item"
+                    data-meal="{{ reminder.meal_type }}"
+                    data-time="{{ reminder.reminder_time }}"
+                    data-enabled="{{ reminder.is_enabled|yesno:'true,false' }}"
+                >
+
+                    <div class="reminder-top">
+
+                        <div class="meal-name">
+                            {{ reminder.meal_type }}
+                        </div>
+
+                        <div class="meal-icon">
+
+                            {% if reminder.meal_type == "Breakfast" %}
+                                🍳
+                            {% elif reminder.meal_type == "Mid-morning" %}
+                                🍎
+                            {% elif reminder.meal_type == "Lunch" %}
+                                🍛
+                            {% elif reminder.meal_type == "Evening Snack" %}
+                                🥗
+                            {% else %}
+                                🍽️
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                    <label>
+                        Reminder Time
+                    </label>
+
+                    <input
+                        type="time"
+                        name="time_{{ reminder.meal_type }}"
+                        value="{{ reminder.reminder_time }}"
+                        required
+                    >
+
+                    <label class="toggle-row">
+
+                        <input
+                            type="checkbox"
+                            name="enabled_{{ reminder.meal_type }}"
+                            {% if reminder.is_enabled %}checked{% endif %}
+                        >
+
+                        Enable this reminder
+
+                    </label>
+
+
+                    {% if reminder.food %}
+
+                    <div class="food-details">
+
+                        <strong>Today's Food</strong>
+
+                        <p>
+                            {{ reminder.food.food }}
+                        </p>
+
+                        {% if reminder.food.calories %}
+                        <p>
+                            Calories: {{ reminder.food.calories }}
+                        </p>
+                        {% endif %}
+
+                        {% if reminder.food.protein %}
+                        <p>
+                            Protein: {{ reminder.food.protein }} g
+                        </p>
+                        {% endif %}
+
+                    </div>
+
+                    {% else %}
+
+                    <div class="food-details">
+
+                        <p>
+                            No matching food details found in today's diet plan.
+                        </p>
+
+                    </div>
+
+                    {% endif %}
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+
+            <div class="save-section">
+
+                <button type="submit" class="save-btn">
+                    Save Reminder Settings
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- INFORMATION -->
+
+    <div class="card">
+
+        <h2>How It Works</h2>
+
+        <p class="empty">
+
+            1. Set your breakfast, lunch and dinner timings.<br><br>
+
+            2. Enable the sound reminder.<br><br>
+
+            3. Keep this page open in your browser.<br><br>
+
+            4. When the scheduled time arrives, FitAI speaks your meal reminder.<br><br>
+
+            5. Your meal details are loaded from your generated diet plan.
+
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- SOUND AND REMINDER JAVASCRIPT -->
+
+<script>
+
+    // ========================================================
+    // SOUND SETTINGS
+    // ========================================================
+
+    const soundButton = document.getElementById("soundButton");
+
+    const soundStatus = document.getElementById("soundStatus");
+
+    const notificationStatus = document.getElementById(
+        "notificationStatus"
+    );
+
+    let soundEnabled = localStorage.getItem("fitaiSoundEnabled") === "true";
+
+
+    // Update sound button display
+
+    function updateSoundButton() {
+
+        if (soundEnabled) {
+
+            soundButton.textContent = "Disable Sound";
+
+            soundStatus.textContent = "Sound reminders are enabled.";
+
+        } else {
+
+            soundButton.textContent = "Enable Sound";
+
+            soundStatus.textContent = "Sound is currently disabled.";
+
+        }
+
+    }
+
+
+    updateSoundButton();
+
+
+    // ========================================================
+    // SPEAK MEAL REMINDER
+    // ========================================================
+
+    function speakReminder(mealName) {
+
+        if (!soundEnabled) {
+            return;
+        }
+
+        if ("speechSynthesis" in window) {
+
+            window.speechSynthesis.cancel();
+
+            const message = new SpeechSynthesisUtterance(
+                "Hello! It is time for " +
+                mealName +
+                ". Please eat your " +
+                mealName +
+                "."
+            );
+
+            message.lang = "en-IN";
+
+            message.rate = 0.9;
+
+            message.pitch = 1;
+
+            message.volume = 1;
+
+            window.speechSynthesis.speak(message);
+
+        } else {
+
+            playBeep();
+
+        }
+
+    }
+
+
+    // ========================================================
+    // BEEP SOUND FALLBACK
+    // ========================================================
+
+    function playBeep() {
+
+        const AudioContext =
+            window.AudioContext || window.webkitAudioContext;
+
+        if (!AudioContext) {
+            return;
+        }
+
+        const audioContext = new AudioContext();
+
+        const oscillator = audioContext.createOscillator();
+
+        const gain = audioContext.createGain();
+
+        oscillator.connect(gain);
+
+        gain.connect(audioContext.destination);
+
+        oscillator.frequency.value = 800;
+
+        oscillator.type = "sine";
+
+        gain.gain.value = 0.3;
+
+        oscillator.start();
+
+        oscillator.stop(audioContext.currentTime + 0.7);
+
+    }
+
+
+    // ========================================================
+    // ENABLE / DISABLE SOUND
+    // ========================================================
+
+    soundButton.addEventListener("click", async function() {
+
+        soundEnabled = !soundEnabled;
+
+        localStorage.setItem(
+            "fitaiSoundEnabled",
+            soundEnabled
+        );
+
+        updateSoundButton();
+
+        if (soundEnabled) {
+
+            // Request notification permission.
+            if ("Notification" in window) {
+
+                const permission = await Notification.requestPermission();
+
+                notificationStatus.textContent =
+                    permission === "granted"
+                    ? "Browser notifications are enabled."
+                    : "Voice reminders are enabled. Browser notifications are not enabled.";
+
+            }
+
+            // Test the voice after the user's click.
+            speakReminder("sound test");
+
+        } else {
+
+            if ("speechSynthesis" in window) {
+                window.speechSynthesis.cancel();
+            }
+
+        }
+
+    });
+
+
+    // ========================================================
+    // BROWSER NOTIFICATION
+    // ========================================================
+
+    function showNotification(mealName) {
+
+        if (
+            "Notification" in window &&
+            Notification.permission === "granted"
+        ) {
+
+            new Notification("FitAI Meal Reminder", {
+
+                body: "It is time for " + mealName + "!",
+
+                icon: ""
+
+            });
+
+        }
+
+    }
+
+
+    // ========================================================
+    // CHECK MEAL TIMES
+    // ========================================================
+
+    function checkMealReminders() {
+
+        const now = new Date();
+
+        const hours = String(
+            now.getHours()
+        ).padStart(2, "0");
+
+        const minutes = String(
+            now.getMinutes()
+        ).padStart(2, "0");
+
+        const currentTime = hours + ":" + minutes;
+
+        const today = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0")
+        ].join("-");
+
+        const reminderCards = document.querySelectorAll(
+            ".reminder-item"
+        );
+
+        reminderCards.forEach(function(card) {
+
+            const mealName = card.dataset.meal;
+
+            const reminderTime = card.querySelector(
+                'input[type="time"]'
+            ).value;
+
+            const checkbox = card.querySelector(
+                'input[type="checkbox"]'
+            );
+
+            const isEnabled = checkbox.checked;
+
+            if (!isEnabled) {
+                return;
+            }
+
+            if (currentTime === reminderTime) {
+
+                const reminderKey =
+                    "fitai_reminder_" + today + "_" + mealName;
+
+                const alreadyReminded =
+                    localStorage.getItem(reminderKey);
+
+                if (!alreadyReminded) {
+
+                    localStorage.setItem(
+                        reminderKey,
+                        "true"
+                    );
+
+                    speakReminder(mealName);
+
+                    showNotification(mealName);
+
+                }
+
+            }
+
+        });
+
+    }
+
+
+    // ========================================================
+    // LIVE CLOCK
+    // ========================================================
+
+    function updateClock() {
+
+        const now = new Date();
+
+        const clock = document.getElementById("liveClock");
+
+        clock.textContent =
+            "Current Time: " +
+            now.toLocaleTimeString();
+
+    }
+
+
+    // Check every five seconds.
+    setInterval(checkMealReminders, 5000);
+
+    setInterval(updateClock, 1000);
+
+    checkMealReminders();
+
+    updateClock();
+
+
+</script>
+
+</body>
+
+</html>

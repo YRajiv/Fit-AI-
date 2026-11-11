@@ -1,0 +1,839 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Workouts - FitAI</title>
+
+    <style>
+        :root {
+            --bg-deep: #0f0c1b;
+            --bg-card: rgba(30, 24, 54, 0.6);
+            --purple: #8b5cf6;
+            --purple-light: #a78bfa;
+            --text: #ffffff;
+            --text-muted: #b8b3c9;
+            --border: rgba(139, 92, 246, 0.25);
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 35px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(15px);
+        }
+
+        .card h2 {
+            margin-bottom: 12px;
+            font-size: 23px;
+        }
+
+        .description {
+            color: var(--text-muted);
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 22px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .form-group label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 14px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: #211b36;
+            color: white;
+            outline: none;
+            font-size: 15px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: var(--purple);
+        }
+
+        .form-group option {
+            background: #211b36;
+        }
+
+        .form-actions {
+            margin-top: 25px;
+        }
+
+        .submit-btn,
+        .start-btn,
+        .back-btn {
+            border: none;
+            padding: 14px 24px;
+            border-radius: 9px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .submit-btn,
+        .start-btn {
+            background: var(--purple);
+            color: white;
+        }
+
+        .submit-btn:hover,
+        .start-btn:hover {
+            background: #7545df;
+        }
+
+        .back-btn {
+            background: #30264b;
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .message {
+            padding: 14px;
+            border-radius: 9px;
+            margin-bottom: 20px;
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+        }
+
+        .message p {
+            margin: 5px 0;
+        }
+
+        .workout-info {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .info-item {
+            background: rgba(139, 92, 246, 0.12);
+            border: 1px solid var(--border);
+            padding: 17px;
+            border-radius: 12px;
+            overflow-wrap: anywhere;
+        }
+
+        .info-item span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .info-item strong {
+            font-size: 16px;
+        }
+
+        .exercise-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        .exercise-card {
+            background: rgba(139, 92, 246, 0.09);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            padding: 20px;
+            transition: 0.3s;
+            min-width: 0;
+        }
+
+        .exercise-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--purple);
+        }
+
+        .exercise-card h3 {
+            margin-bottom: 12px;
+            color: var(--purple-light);
+        }
+
+        .exercise-card p {
+            color: var(--text-muted);
+            margin: 7px 0;
+            font-size: 14px;
+        }
+
+        .exercise-number {
+            display: inline-block;
+            background: var(--purple);
+            padding: 5px 10px;
+            border-radius: 7px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        /* EXERCISE VIDEO PLAYER */
+
+        .video-heading {
+            color: var(--purple-light);
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .exercise-video {
+            width: 100%;
+            margin-top: 10px;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+            border-radius: 12px;
+            background: #000;
+            border: 1px solid var(--border);
+        }
+
+        .exercise-video video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+
+        .video-unavailable {
+            width: 100%;
+            padding: 20px;
+            margin-top: 15px;
+            text-align: center;
+            background: rgba(139, 92, 246, 0.10);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .workout-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 25px;
+        }
+
+        .recent-workout {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .recent-workout:last-child {
+            border-bottom: none;
+        }
+
+        .recent-workout p {
+            color: var(--text-muted);
+            margin-top: 6px;
+            font-size: 14px;
+        }
+
+        .empty-message {
+            color: var(--text-muted);
+            padding: 15px 0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 18px;
+            }
+
+            .form-grid,
+            .exercise-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workout-info {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .workout-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="page-header">
+        <h1>Workout Recommendations</h1>
+        <p>
+            Complete your fitness assessment to receive personalized workout recommendations.
+        </p>
+    </div>
+
+    <!-- STEP 1: FITNESS ASSESSMENT FORM -->
+
+    {% if not form_submitted %}
+
+    <div class="card">
+
+        <h2>Fitness Assessment</h2>
+
+        <p class="description">
+            Tell us about your fitness level, body measurements and available equipment.
+            FitAI will generate a workout plan based on your details.
+        </p>
+
+        {% if form_errors %}
+        <div class="message error" style="display:block;">
+            {% for error in form_errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'workout:workouts' %}">
+
+            {% csrf_token %}
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="fitness_level">Fitness Level</label>
+
+                    <select name="fitness_level" id="fitness_level" required>
+                        <option value="">Select Fitness Level</option>
+
+                        <option value="Beginner"
+                            {% if selected_fitness_level == "Beginner" %}selected{% endif %}>
+                            Beginner
+                        </option>
+
+                        <option value="Intermediate"
+                            {% if selected_fitness_level == "Intermediate" %}selected{% endif %}>
+                            Intermediate
+                        </option>
+
+                        <option value="Advanced"
+                            {% if selected_fitness_level == "Advanced" %}selected{% endif %}>
+                            Advanced
+                        </option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="height_cm">Height (cm)</label>
+
+                    <input
+                        type="number"
+                        name="height_cm"
+                        id="height_cm"
+                        placeholder="Enter your height"
+                        min="50"
+                        max="250"
+                        step="0.1"
+                        value="{{ selected_height|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="weight_kg">Weight (kg)</label>
+
+                    <input
+                        type="number"
+                        name="weight_kg"
+                        id="weight_kg"
+                        placeholder="Enter your weight"
+                        min="10"
+                        max="300"
+                        step="0.1"
+                        value="{{ selected_weight|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="has_equipment">
+                        Do you have workout equipment?
+                    </label>
+
+                    <select name="has_equipment" id="has_equipment">
+
+                        <option value="No"
+                            {% if selected_has_equipment != "Yes" %}selected{% endif %}>
+                            No
+                        </option>
+
+                        <option value="Yes"
+                            {% if selected_has_equipment == "Yes" %}selected{% endif %}>
+                            Yes
+                        </option>
+
+                    </select>
+                </div>
+
+                <div class="form-group" id="equipmentTypeGroup">
+
+                    <label for="equipment">Select Equipment Type</label>
+
+                    <select name="equipment" id="equipment">
+
+                        <option value="No Equipment"
+                            {% if selected_equipment == "No Equipment" %}selected{% endif %}>
+                            No Equipment
+                        </option>
+
+                        <option value="Dumbbells"
+                            {% if selected_equipment == "Dumbbells" %}selected{% endif %}>
+                            Dumbbells
+                        </option>
+
+                        <option value="Full Gym"
+                            {% if selected_equipment == "Full Gym" %}selected{% endif %}>
+                            Full Gym
+                        </option>
+
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="submit-btn">
+                    Generate My Workout
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- STEP 2: RECOMMENDED WORKOUTS -->
+
+    {% if form_submitted and workout_plan and recommended_exercises %}
+
+    <div class="card">
+
+        <h2>Your Recommended Workout</h2>
+
+        <p class="description">
+            Your personalized workout plan is ready based on your fitness assessment.
+        </p>
+
+        <!-- USER FITNESS DETAILS -->
+
+        <div class="workout-info">
+
+            <div class="info-item">
+                <span>Fitness Level</span>
+                <strong>{{ profile.fitness_level }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Height</span>
+                <strong>{{ profile.height_cm }} cm</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Weight</span>
+                <strong>{{ profile.weight_kg }} kg</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Goal</span>
+                <strong>{{ profile.get_goal_display }}</strong>
+            </div>
+
+        </div>
+
+        <!-- WORKOUT DETAILS -->
+
+        <div class="workout-info">
+
+            <div class="info-item">
+                <span>Workout Plan</span>
+                <strong>{{ recommended_name }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Category</span>
+                <strong>{{ recommended_category }}</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Duration</span>
+                <strong>{{ recommended_duration }} min</strong>
+            </div>
+
+            <div class="info-item">
+                <span>Equipment</span>
+                <strong>{{ recommended_equipment }}</strong>
+            </div>
+
+        </div>
+
+        <!-- RECOMMENDED EXERCISES -->
+
+        <h2>Recommended Exercises</h2>
+
+        <div class="exercise-grid">
+
+            {% for exercise in recommended_exercises %}
+
+            <div class="exercise-card">
+
+                <span class="exercise-number">
+                    Exercise {{ forloop.counter }}
+                </span>
+
+                <h3>{{ exercise.name }}</h3>
+
+                <p>
+                    <strong>Muscle:</strong>
+                    {{ exercise.muscle }}
+                </p>
+
+                <p>
+                    <strong>Category:</strong>
+                    {{ exercise.category }}
+                </p>
+
+                <p>
+                    <strong>Difficulty:</strong>
+                    {{ exercise.difficulty }}
+                </p>
+
+                <p>
+                    <strong>Equipment:</strong>
+                    {{ exercise.equipment }}
+                </p>
+
+                <p>
+                    <strong>Sets:</strong>
+                    {{ exercise.sets }}
+                </p>
+
+                <p>
+                    <strong>Reps:</strong>
+                    {{ exercise.reps }}
+                </p>
+
+                <!-- MP4 VIDEO PLAYER -->
+
+                <h4 class="video-heading">
+                    Exercise Demonstration
+                </h4>
+
+                {% if exercise.video %}
+
+                <div class="exercise-video">
+
+                    <video controls preload="metadata" playsinline>
+
+                        <source src="{{ exercise.video }}" type="video/mp4">
+
+                        Your browser does not support MP4 video playback.
+
+                    </video>
+
+                </div>
+
+                {% else %}
+
+                <div class="video-unavailable">
+                    Video demonstration will be added soon.
+                </div>
+
+                {% endif %}
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+        <!-- WORKOUT ACTIONS -->
+
+        <div class="workout-actions">
+
+            <form
+                method="POST"
+                action="{% url 'workout:start_workout' %}"
+                id="startWorkoutForm">
+
+                {% csrf_token %}
+
+                <input
+                    type="hidden"
+                    name="workout_name"
+                    value="{{ recommended_name }}"
+                >
+
+                <button type="submit" class="start-btn">
+                    Start Workout
+                </button>
+
+            </form>
+
+            <a href="{% url 'workout:workouts' %}" class="back-btn">
+                Change Assessment
+            </a>
+
+        </div>
+
+        <div id="workoutMessage"></div>
+
+    </div>
+
+    {% elif form_submitted %}
+
+    <div class="card">
+
+        <h2>No Workout Recommendations</h2>
+
+        <p class="empty-message">
+            No suitable exercises were found for your profile.
+            Please change your assessment details and try again.
+        </p>
+
+        <a href="{% url 'workout:workouts' %}" class="back-btn">
+            Try Again
+        </a>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- RECENT WORKOUTS -->
+
+    {% if recent_workouts %}
+
+    <div class="card">
+
+        <h2>Recent Workouts</h2>
+
+        {% for workout in recent_workouts %}
+
+        <div class="recent-workout">
+
+            <strong>{{ workout.workout_name }}</strong>
+
+            <p>
+                {{ workout.workout_category }}
+                | {{ workout.difficulty_level }}
+                | {{ workout.duration }} minutes
+            </p>
+
+            <p>
+                {% if workout.is_completed %}
+                    Completed
+                {% else %}
+                    In Progress
+                {% endif %}
+            </p>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- JAVASCRIPT -->
+
+<script>
+
+// Equipment Yes / No functionality
+
+const hasEquipment = document.getElementById("has_equipment");
+
+const equipmentTypeGroup = document.getElementById("equipmentTypeGroup");
+
+const equipmentSelect = document.getElementById("equipment");
+
+
+function updateEquipmentField() {
+
+    if (!hasEquipment || !equipmentTypeGroup || !equipmentSelect) {
+        return;
+    }
+
+    if (hasEquipment.value === "Yes") {
+
+        equipmentTypeGroup.style.display = "flex";
+
+        equipmentSelect.disabled = false;
+
+    } else {
+
+        equipmentTypeGroup.style.display = "none";
+
+        equipmentSelect.value = "No Equipment";
+
+        equipmentSelect.disabled = true;
+
+    }
+
+}
+
+
+updateEquipmentField();
+
+
+if (hasEquipment) {
+
+    hasEquipment.addEventListener("change", updateEquipmentField);
+
+}
+
+
+// Start Workout AJAX functionality
+
+const startWorkoutForm = document.getElementById("startWorkoutForm");
+
+if (startWorkoutForm) {
+
+    startWorkoutForm.addEventListener("submit", async function(event) {
+
+        event.preventDefault();
+
+        const button = startWorkoutForm.querySelector("button");
+
+        const message = document.getElementById("workoutMessage");
+
+        button.disabled = true;
+
+        button.textContent = "Starting...";
+
+        try {
+
+            const response = await fetch(
+                startWorkoutForm.action,
+                {
+                    method: "POST",
+                    body: new FormData(startWorkoutForm),
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.status === "success") {
+
+                message.innerHTML =
+                    "<div class='message' style='background:rgba(34,197,94,0.12);color:#86efac;margin-top:20px;'>" +
+                    data.message +
+                    "</div>";
+
+                button.textContent = "Workout Started";
+
+            } else {
+
+                message.innerHTML =
+                    "<div class='message error'>" +
+                    data.message +
+                    "</div>";
+
+                button.disabled = false;
+
+                button.textContent = "Start Workout";
+
+            }
+
+        } catch (error) {
+
+            message.innerHTML =
+                "<div class='message error'>Something went wrong. Please try again.</div>";
+
+            button.disabled = false;
+
+            button.textContent = "Start Workout";
+
+        }
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>

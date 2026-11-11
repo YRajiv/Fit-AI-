@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitAI - Nutrition Tracker</title>
+    <style>
+        :root {
+            --bg-dark: #0d0f1d;
+            --card-bg: #16182e;
+            --card-inner: #1e203c;
+            --accent-purple: #6c5ce7;
+            --text-main: #ffffff;
+            --text-sub: #8a8d structure;
+            --border-color: #2a2d4a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 240px;
+            background-color: var(--card-bg);
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .brand {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--accent-purple);
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-item a {
+            color: #a0a5c0;
+            text-decoration: none;
+            padding: 12px 16px;
+            border-radius: 12px;
+            display: block;
+            transition: 0.3s;
+        }
+
+        .nav-item.active a, .nav-item a:hover {
+            background-color: var(--accent-purple);
+            color: #fff;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 32px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .btn-scan {
+            background: linear-gradient(135deg, #8e44ad, var(--accent-purple));
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+        }
+
+        .dashboard-card {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1.2fr 2fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        /* Media Frame */
+        .food-preview {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            height: 280px;
+            background-color: var(--card-inner);
+        }
+
+        .food-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ai-tag {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(108, 92, 231, 0.85);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Macros Grid */
+        .macros-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .macro-card {
+            background-color: var(--card-inner);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .macro-val {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+
+        .ai-tip-box {
+            margin-top: 24px;
+            background-color: var(--card-inner);
+            padding: 16px;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-purple);
+        }
+
+        .scan-status {
+            margin-top: 12px;
+            color: #a0a5c0;
+        }
+
+        .scan-status.error {
+            color: #ff8a8a;
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CSRF Token Hidden Input for JavaScript Access -->
+    {% csrf_token %}
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="brand">🏋️ FitAI</div>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="/">🏠 Dashboard</a></li>
+            <li class="nav-item active"><a href="{% url 'nutrition_page' %}">🥗 Nutrition</a></li>
+            <li class="nav-item"><a href="#">💪 Workout</a></li>
+            <li class="nav-item"><a href="#">📈 Progress</a></li>
+        </ul>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h1>Nutrition</h1>
+                <p style="color: #8a8d structure;">Track your daily nutrition and make healthier choices.</p>
+            </div>
+            <button class="btn-scan btn-scan-food">📷 Scan Food</button>
+        </div>
+        <p id="scan-status" class="scan-status" role="status" aria-live="polite"></p>
+
+        <div class="dashboard-card">
+            <h2>Food Details</h2>
+            <div class="grid-container">
+                <!-- Food Image Section -->
+                <div>
+                    <div class="food-preview">
+                        <span class="ai-tag">✨ AI Detected</span>
+                        <img id="food-image" src="https://via.placeholder.com/400x300?text=Scan+Your+Meal" alt="Food Image">
+                    </div>
+                    <h3 id="food-name" style="margin-top: 12px;">No Food Scanned</h3>
+                </div>
+
+                <!-- Macros Grid -->
+                <div class="macros-grid">
+                    <div class="macro-card">
+                        <div>
+                            <small>Calories</small>
+                            <div class="macro-val" id="val-calories">0 kcal</div>
+                        </div>
+                    </div>
+                    <div class="macro-card">
+                        <div>
+                            <small>Protein</small>
+                            <div class="macro-val" id="val-protein">0 g</div>
+                        </div>
+                    </div>
+                    <div class="macro-card">
+                        <div>
+                            <small>Carbohydrates</small>
+                            <div class="macro-val" id="val-carbs">0 g</div>
+                        </div>
+                    </div>
+                    <div class="macro-card">
+                        <div>
+                            <small>Total Fat</small>
+                            <div class="macro-val" id="val-fat">0 g</div>
+                        </div>
+                    </div>
+                    <div class="macro-card">
+                        <div>
+                            <small>Fiber</small>
+                            <div class="macro-val" id="val-fiber">0 g</div>
+                        </div>
+                    </div>
+                    <div class="macro-card">
+                        <div>
+                            <small>Sugar</small>
+                            <div class="macro-val" id="val-sugar">0 g</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Tip Container -->
+            <div class="ai-tip-box">
+                💡 <strong>AI Tip:</strong> <span id="val-ai-tip">Scan a meal using your camera to view dynamic breakdown and nutritional advice.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebCam Scanner Modal -->
+    <div id="cameraModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 12px;">Scan Your Food</h3>
+            <video id="webcam" autoplay playsinline style="width: 100%; border-radius: 8px;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <div class="modal-actions">
+                <button id="captureBtn" class="btn-scan">Capture & Analyze</button>
+                <button id="closeModalBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+ <!-- Logic Script -->
+    <script>
+        const scanBtn = document.querySelector('.btn-scan-food');
+        const cameraModal = document.getElementById('cameraModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const scanStatus = document.getElementById('scan-status');
+        let stream = null;
+
+        function setScanStatus(message, isError = false) {
+            scanStatus.textContent = message;
+            scanStatus.classList.toggle('error', isError);
+        }
+
+        // Start WebCam Stream
+        scanBtn.addEventListener('click', async () => {
+            try {
+                setScanStatus('');
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                cameraModal.style.display = 'flex';
+            } catch (err) {
+                setScanStatus("Camera access error: " + err.message, true);
+            }
+        });
+
+        // Close WebCam Stream
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            cameraModal.style.display = 'none';
+        }
+
+        closeModalBtn.addEventListener('click', stopCamera);
+
+        // Process Image Capture and Send to View
+        captureBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            if (!video.videoWidth) {
+                setScanStatus('The camera is not ready yet. Please wait a moment and try again.', true);
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvas.toDataURL('image/jpeg');
+            document.getElementById('food-image').src = imageData;
+            stopCamera();
+
+            setScanStatus('Analyzing your food image...');
+            captureBtn.disabled = true;
+
+            fetch("/nutrition/scan/", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ image: imageData })
+            })
+            .then(async response => {
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Could not analyze this image. Please try again.');
+                }
+                updateDashboard(result.nutrition);
+                setScanStatus('Nutrition estimate ready.');
+            })
+            .catch(error => {
+                setScanStatus(error.message || 'Network error. Please try again.', true);
+            })
+            .finally(() => {
+                captureBtn.disabled = false;
+            });
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            if (!cookieValue) {
+                const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+                if (csrfInput) cookieValue = csrfInput.value;
+            }
+            return cookieValue;
+        }
+
+        function updateDashboard(data) {
+            document.querySelector('#food-name').textContent = data.food_name || 'Scanned Meal';
+            document.querySelector('#val-calories').textContent = `${data.calories ?? 0} kcal`;
+            document.querySelector('#val-protein').textContent = `${data.protein ?? 0} g`;
+            
+            const carbsValue = data.carbs ?? data.carbohydrates ?? 0;
+            document.querySelector('#val-carbs').textContent = `${carbsValue} g`;
+            
+            const fatValue = data.fat ?? data.fats ?? 0;
+            document.querySelector('#val-fat').textContent = `${fatValue} g`;
+            
+            document.querySelector('#val-fiber').textContent = `${data.fiber ?? 0} g`;
+            document.querySelector('#val-sugar').textContent = `${data.sugar ?? 0} g`;
+            document.querySelector('#val-ai-tip').textContent = data.ai_tip || 'Great job tracking your nutrition!';
+        }
+    </script>
+</body>
+</html>

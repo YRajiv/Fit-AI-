@@ -1,0 +1,716 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FitAI - BMI Based Diet Plan</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 30px 20px;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: radial-gradient(
+                circle at top left,
+                #1e1b4b,
+                #0c091a
+            );
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        /* HEADER */
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 750;
+            background: linear-gradient(135deg, #fff, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 7px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 11px 18px;
+            border-radius: 12px;
+            border: 1px solid #a855f7;
+            background: rgba(168,85,247,.2);
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: .2s;
+        }
+
+        .button:hover {
+            background: #a855f7;
+        }
+
+        /* BMI SUMMARY CARDS */
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .summary-card,
+        .panel {
+            background: rgba(255,255,255,.045);
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.22);
+        }
+
+        .summary-card {
+            padding: 20px;
+        }
+
+        .summary-label {
+            color: #94a3b8;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            margin-bottom: 8px;
+        }
+
+        .summary-value {
+            color: #f8fafc;
+            font-size: 25px;
+            font-weight: 750;
+        }
+
+        .summary-note {
+            color: #a1a1aa;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .bmi-card {
+            border-color: rgba(192,132,252,.45);
+        }
+
+        .bmi-card .summary-value {
+            color: #c084fc;
+        }
+
+        /* MAIN PANEL */
+
+        .panel {
+            padding: 24px;
+        }
+
+        .panel-heading {
+            font-size: 20px;
+            margin-bottom: 7px;
+        }
+
+        .panel-description {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        /* WEEKLY GRID */
+
+        .weekly-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .day-col {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            border-radius: 16px;
+            background: rgba(0,0,0,.28);
+            border: 1px solid rgba(255,255,255,.08);
+        }
+
+        .day-header {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+
+        .day-name {
+            color: #c084fc;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* MEAL CARDS */
+
+        .meal-card {
+            padding: 11px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.055);
+            border: 1px solid rgba(255,255,255,.06);
+            transition: transform .2s;
+        }
+
+        .meal-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255,255,255,.09);
+        }
+
+        .meal-type {
+            color: #94a3b8;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .meal-name {
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 650;
+            line-height: 1.4;
+            margin: 5px 0;
+        }
+
+        .ingredients {
+            color: #a1a1aa;
+            font-size: 10px;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+
+        .ingredient {
+            margin-bottom: 2px;
+        }
+
+        /* NUTRITION */
+
+        .nutrition-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .nutrition-item {
+            padding: 6px 4px;
+            border-radius: 5px;
+            background: rgba(0,0,0,.2);
+            text-align: center;
+            color: #94a3b8;
+            font-size: 9px;
+        }
+
+        .nutrition-item strong {
+            display: block;
+            color: #e2e8f0;
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        .meal-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+            font-size: 10px;
+        }
+
+        .meal-cal {
+            color: #818cf8;
+            font-weight: 650;
+        }
+
+        .meal-protein {
+            color: #f472b6;
+            font-weight: 650;
+        }
+
+        .meal-cost {
+            color: #4ade80;
+            font-weight: 700;
+        }
+
+        /* DAILY TOTAL */
+
+        .daily-total {
+            margin-top: 2px;
+            padding: 9px;
+            border-radius: 10px;
+            background: rgba(99,102,241,.12);
+            border: 1px solid rgba(129,140,248,.2);
+        }
+
+        .daily-total-title {
+            color: #a5b4fc;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .daily-total-row {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .daily-total-item {
+            color: #cbd5e1;
+            font-size: 10px;
+        }
+
+        .daily-total-item strong {
+            color: #fff;
+        }
+
+        /* ERROR */
+
+        .error-box {
+            margin: 0 auto 20px;
+            padding: 15px;
+            border-radius: 12px;
+            color: #fca5a5;
+            background: rgba(239,68,68,.12);
+            border: 1px solid rgba(239,68,68,.3);
+        }
+
+        /* EMPTY */
+
+        .empty-message {
+            text-align: center;
+            padding: 55px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-message h2 {
+            color: #f8fafc;
+            margin-bottom: 10px;
+        }
+
+        .bmi-info {
+            margin-top: 16px;
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 1200px) {
+            .weekly-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 12px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .weekly-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                padding: 15px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- HEADER -->
+
+    <header class="header">
+
+        <div>
+            <h1>7-Day BMI-Based Diet Plan 🥗</h1>
+
+            <p class="subtitle">
+                Your Indian diet plan based on your BMI.
+            </p>
+        </div>
+
+        <a href="{% url 'onboarding' %}" class="button">
+            ⚙️ Update Height &amp; Weight
+        </a>
+
+    </header>
+
+
+    <!-- ERROR MESSAGE -->
+
+    {% if error %}
+
+    <div class="error-box">
+        <strong>Diet generation failed:</strong>
+        {{ error }}
+    </div>
+
+    {% endif %}
+
+
+    <!-- BMI SUMMARY -->
+
+    <section class="summary-grid">
+
+        <div class="summary-card">
+
+            <div class="summary-label">
+                Height
+            </div>
+
+            <div class="summary-value">
+
+                {% if profile.height_cm %}
+                    {{ profile.height_cm }}
+                {% else %}
+                    —
+                {% endif %}
+
+                <span style="font-size:13px;color:#a1a1aa;">
+                    cm
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="summary-card">
+
+            <div class="summary-label">
+                Weight
+            </div>
+
+            <div class="summary-value">
+
+                {% if profile.weight_kg %}
+                    {{ profile.weight_kg }}
+                {% else %}
+                    —
+                {% endif %}
+
+                <span style="font-size:13px;color:#a1a1aa;">
+                    kg
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="summary-card bmi-card">
+
+            <div class="summary-label">
+                Your BMI
+            </div>
+
+            <div class="summary-value">
+
+                {% if bmi %}
+                    {{ bmi }}
+                {% else %}
+                    —
+                {% endif %}
+
+            </div>
+
+            <div class="summary-note">
+
+                {% if bmi_category %}
+                    {{ bmi_category }}
+                {% else %}
+                    BMI category will appear here
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- WEEKLY DIET PLAN -->
+
+    <main class="panel">
+
+        <h2 class="panel-heading">
+            Your Weekly Meal Plan
+        </h2>
+
+        <p class="panel-description">
+            Your AI-generated Indian diet plan with
+            estimated nutritional information.
+        </p>
+
+
+        {% if weekly_plan %}
+
+        <div class="weekly-grid">
+
+            {% for day, day_data in weekly_plan.items %}
+
+            <section class="day-col">
+
+                <!-- DAY HEADER -->
+
+                <div class="day-header">
+
+                    <div class="day-name">
+                        {{ day }}
+                    </div>
+
+                </div>
+
+
+                <!-- MEALS -->
+
+                {% for meal in day_data.meals %}
+
+                <article class="meal-card">
+
+                    <div class="meal-type">
+                        {{ meal.meal }}
+                    </div>
+
+                    <div class="meal-name">
+                        {{ meal.food }}
+                    </div>
+
+
+                    <!-- INGREDIENTS -->
+
+                    {% if meal.ingredients %}
+
+                    <div class="ingredients">
+
+                        {% for ingredient in meal.ingredients %}
+
+                        <div class="ingredient">
+                            • {{ ingredient }}
+                        </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                    {% endif %}
+
+
+                    <!-- NUTRITION -->
+
+                    <div class="nutrition-grid">
+
+                        <div class="nutrition-item">
+                            Calories
+                            <strong>
+                                {{ meal.calories|default:"—" }}
+                            </strong>
+                        </div>
+
+                        <div class="nutrition-item">
+                            Protein
+                            <strong>
+                                {{ meal.protein|default:"—" }}
+                                {% if meal.protein %}g{% endif %}
+                            </strong>
+                        </div>
+
+                        <div class="nutrition-item">
+                            Carbs
+                            <strong>
+                                {{ meal.carbs|default:"—" }}
+                                {% if meal.carbs %}g{% endif %}
+                            </strong>
+                        </div>
+
+                        <div class="nutrition-item">
+                            Fat
+                            <strong>
+                                {{ meal.fat|default:"—" }}
+                                {% if meal.fat %}g{% endif %}
+                            </strong>
+                        </div>
+
+                        <div class="nutrition-item">
+                            Fiber
+                            <strong>
+                                {{ meal.fiber|default:"—" }}
+                                {% if meal.fiber %}g{% endif %}
+                            </strong>
+                        </div>
+
+                        <div class="nutrition-item">
+                            Sugar
+                            <strong>
+                                {{ meal.sugar|default:"—" }}
+                                {% if meal.sugar %}g{% endif %}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <!-- MEAL FOOTER -->
+
+                    <div class="meal-meta">
+
+                        <span class="meal-cal">
+                            🔥 {{ meal.calories|default:"—" }} kcal
+                        </span>
+
+                        <span class="meal-protein">
+                            💪 {{ meal.protein|default:"—" }}g
+                        </span>
+
+                        {% if meal.cost %}
+
+                        <span class="meal-cost">
+                            ₹{{ meal.cost }}
+                        </span>
+
+                        {% endif %}
+
+                    </div>
+
+                </article>
+
+                {% endfor %}
+
+
+                <!-- DAILY TOTAL -->
+
+                {% if day_data.total %}
+
+                <div class="daily-total">
+
+                    <div class="daily-total-title">
+                        Daily Total
+                    </div>
+
+                    <div class="daily-total-row">
+
+                        <span class="daily-total-item">
+                            🔥
+                            <strong>
+                                {{ day_data.total.calories|default:"—" }}
+                            </strong>
+                            kcal
+                        </span>
+
+                        <span class="daily-total-item">
+                            💪
+                            <strong>
+                                {{ day_data.total.protein|default:"—" }}
+                            </strong>
+                            g
+                        </span>
+
+                        {% if day_data.total.cost %}
+
+                        <span class="daily-total-item">
+                            💰 ₹
+                            <strong>
+                                {{ day_data.total.cost }}
+                            </strong>
+                        </span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+            </section>
+
+            {% endfor %}
+
+        </div>
+
+
+        {% else %}
+
+        <!-- EMPTY STATE -->
+
+        <div class="empty-message">
+
+            <h2>No Diet Plan Found 🥗</h2>
+
+            <p>
+                Enter your height and weight to calculate
+                your BMI and create your diet plan.
+            </p>
+
+            <br>
+
+            <a href="{% url 'onboarding' %}" class="button">
+                Enter Height &amp; Weight
+            </a>
+
+        </div>
+
+        {% endif %}
+
+    </main>
+
+
+    <p class="bmi-info">
+        BMI is a screening measure, not a diagnosis.
+        It does not independently determine your calorie
+        or protein requirements. Nutrition plans should
+        also consider activity, food preferences and
+        individual health needs.
+    </p>
+
+</div>
+
+</body>
+</html>

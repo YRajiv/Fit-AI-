@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FitAI - AI Posture Check</title>
+
+   
+
+    <!-- MediaPipe Libraries -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+
+
+    <style>
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+       
+
+        body {
+
+            background: linear-gradient(135deg, #0f0c20 0%, #15102a 50%, #080612 100%);
+
+            color: #ffffff;
+
+            display: flex;
+
+            height: 100vh;
+
+            overflow: hidden;
+
+        }
+
+
+
+        .glass-card {
+
+            background: rgba(255, 255, 255, 0.05);
+
+            backdrop-filter: blur(16px);
+
+            -webkit-backdrop-filter: blur(16px);
+
+            border: 1px solid rgba(255, 255, 255, 0.1);
+
+            border-radius: 20px;
+
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+        }
+
+
+
+        .sidebar {
+
+            width: 240px;
+
+            padding: 25px 20px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 20px;
+
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+
+        }
+
+        .logo { font-size: 22px; font-weight: bold; color: #a855f7; display: flex; align-items: center; gap: 8px; }
+
+        .nav-item { padding: 12px 16px; border-radius: 12px; color: #a1a1aa; text-decoration: none; cursor: pointer; transition: 0.3s; }
+
+        .nav-item.active { background: linear-gradient(90deg, #6366f1, #a855f7); color: white; font-weight: 600; }
+
+
+
+        .main-content {
+
+            flex: 1;
+
+            padding: 25px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 20px;
+
+            overflow-y: auto;
+
+        }
+
+
+
+        .header-bar {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+        }
+
+        .exercise-select {
+
+            background: rgba(255, 255, 255, 0.1);
+
+            border: 1px solid rgba(255, 255, 255, 0.2);
+
+            color: white;
+
+            padding: 10px 18px;
+
+            border-radius: 12px;
+
+            outline: none;
+
+            font-size: 16px;
+
+            cursor: pointer;
+
+        }
+
+        .exercise-select option, .exercise-select optgroup { background: #15102a; color: white; }
+
+
+
+        .status-pill {
+
+            padding: 8px 18px;
+
+            border-radius: 30px;
+
+            font-weight: bold;
+
+            font-size: 16px;
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
+
+            transition: 0.3s;
+
+        }
+
+        .status-pill.good { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #4ade80; }
+
+        .status-pill.faulty { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; animation: pulse 1s infinite; }
+
+
+
+        @keyframes pulse {
+
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+
+            70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+
+        }
+
+
+
+        .grid-container {
+
+            display: grid;
+
+            grid-template-columns: 280px 1fr 280px;
+
+            gap: 20px;
+
+            height: calc(100vh - 120px);
+
+        }
+
+
+
+        .feed-container {
+
+            position: relative;
+
+            width: 100%;
+
+            height: 100%;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            overflow: hidden;
+
+        }
+
+        #webcam { display: none; }
+
+        #canvas_output {
+
+            width: 100%;
+
+            height: 100%;
+
+            object-fit: cover;
+
+            border-radius: 16px;
+
+        }
+
+
+
+        .metric-card { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+
+        .metric-title { color: #a1a1aa; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+        .metric-value { font-size: 20px; font-weight: bold; color: #f43f5e; }
+
+        .angle-stat { display: flex; justify-content: space-between; font-size: 14px; margin-top: 5px; }
+
+
+
+        .guidance-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+
+        .guidance-list li { display: flex; align-items: flex-start; gap: 10px; color: #cbd5e1; font-size: 14px; }
+
+        .guidance-list li::before { content: "•"; color: #22c55e; font-size: 20px; line-height: 14px; }
+
+
+
+        .btn-action {
+
+            width: 100%;
+
+            padding: 14px;
+
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+
+            border: none;
+
+            border-radius: 12px;
+
+            color: white;
+
+            font-weight: bold;
+
+            cursor: pointer;
+
+            transition: 0.3s;
+
+            margin-top: auto;
+
+        }
+
+        .btn-action:hover { opacity: 0.9; transform: translateY(-2px); }
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+    <div class="sidebar">
+
+        <div class="logo">🏋️ FitAI</div>
+
+        <a class="nav-item">Dashboard</a>
+
+        <a class="nav-item">Scan Food</a>
+
+        <a class="nav-item">Workout</a>
+
+        <a class="nav-item">Diet Plan</a>
+
+        <a class="nav-item active">Posture Check</a>
+
+    </div>
+
+
+
+    <div class="main-content">
+
+        <div class="header-bar">
+
+            <div>
+
+                <h1 style="font-size: 26px;">Posture Detection</h1>
+
+                <p style="color: #a1a1aa; font-size: 14px;">Select workout & align yourself in frame</p>
+
+            </div>
+
+
+
+            <select id="exerciseSelect" class="exercise-select" onchange="switchExercise()">
+
+                <optgroup label="Chest">
+
+                    <option value="pushup">Pushup</option>
+
+                    <option value="bench_press">Bench Press</option>
+
+                    <option value="cable_fly">Cable Fly</option>
+
+                </optgroup>
+
+                <optgroup label="Arms">
+
+                    <option value="bicep_curl">Bicep Curl</option>
+
+                    <option value="tricep_extension">Tricep Extension</option>
+
+                </optgroup>
+
+                <optgroup label="Shoulders & Traps">
+
+                    <option value="overhead_press">Overhead Press</option>
+
+                    <option value="lateral_raise">Lateral Raise</option>
+
+                    <option value="shrugs">Trap Shrugs</option>
+
+                </optgroup>
+
+                <optgroup label="Legs & Core">
+
+                    <option value="squat" selected>Squat</option>
+
+                    <option value="plank">Plank</option>
+
+                    <option value="crunches">Ab Crunches</option>
+
+                </optgroup>
+
+            </select>
+
+
+
+            <div id="statusBadge" class="status-pill good">
+
+                <span id="statusIcon">🔔</span>
+
+                <span id="statusText">STATUS: READY</span>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="grid-container">
+
+            <div class="glass-card metric-card">
+
+                <div class="metric-title">AI Analysis</div>
+
+                <div id="analysisOutput" class="metric-value">GOOD FORM</div>
+
+               
+
+                <hr style="border-color: rgba(255,255,255,0.1);">
+
+               
+
+                <div class="metric-title">Real-time Angles</div>
+
+                <div id="angleMetrics">
+
+                    <div class="angle-stat"><span id="label1">Joint 1:</span> <b id="angle1">0°</b></div>
+
+                    <div class="angle-stat"><span id="label2">Joint 2:</span> <b id="angle2">0°</b></div>
+
+                </div>
+
+
+
+                <div style="margin-top: 20px;">
+
+                    <div class="metric-title">Reps Tracked</div>
+
+                    <div style="font-size: 32px; font-weight: bold; color: #38bdf8;" id="repCounter">0</div>
+
+                    <div style="font-size: 12px; color: #a1a1aa; margin-top: 4px;" id="stageText">Stage: NONE</div>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="glass-card feed-container">
+
+                <video id="webcam" autoplay playsinline></video>
+
+                <canvas id="canvas_output"></canvas>
+
+            </div>
+
+
+
+            <div class="glass-card metric-card">
+
+                <div class="metric-title" style="color: #22c55e;">Corrective Guidance</div>
+
+                <ul class="guidance-list" id="guidanceList"></ul>
+
+
+
+                <button class="btn-action" onclick="resetMetrics()">Reset Detection</button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+
+        const videoElement = document.getElementById('webcam');
+
+        const canvasElement = document.getElementById('canvas_output');
+
+        const canvasCtx = canvasElement.getContext('2d');
+
+       
+
+        let repCount = 0;
+
+        let exerciseStage = null;
+
+        let lastAlertTime = 0;
+
+        let audioCtx = null;
+
+
+
+        const GUIDANCE_TIPS = {
+
+            pushup: ["Keep core engaged to avoid hip sagging.", "Lower chest until elbows reach 90 degrees.", "Keep neck neutral with spine."],
+
+            bench_press: ["Stack wrists directly over elbows.", "Keep feet flat on floor for power.", "Control the bar down without bouncing."],
+
+            cable_fly: ["Maintain a slight bend in elbows throughout.", "Squeeze chest at peak contraction.", "Control weight back slowly."],
+
+            bicep_curl: ["Keep elbows pinned to your sides.", "Avoid swinging shoulders for momentum.", "Fully extend arm at bottom."],
+
+            tricep_extension: ["Lock upper arms in place near head/sides.", "Fully extend elbows at peak move.", "Avoid flaring elbows out."],
+
+            overhead_press: ["Brace core and squeeze glutes.", "Avoid excessive lower back arching.", "Press straight up overhead."],
+
+            lateral_raise: ["Raise dumbbells to shoulder height.", "Lead with elbows, not wrists.", "Avoid using body momentum."],
+
+            shrugs: ["Elevate shoulders toward ears smoothly.", "Pause briefly at the top.", "Do not roll shoulders backward."],
+
+            squat: ["Keep heels grounded firmly.", "Push hips back before bending knees.", "Keep back upright and knees over toes."],
+
+            plank: ["Maintain straight line from head to heels.", "Squeeze glutes and draw belly in.", "Avoid arching or lifting hips high."],
+
+            crunches: ["Curl shoulders off ground using abs.", "Avoid pulling on your neck.", "Exhale as you flex upward."]
+
+        };
+
+
+
+        function initAudio() {
+
+            if (!audioCtx) {
+
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            }
+
+            if (audioCtx.state === 'suspended') {
+
+                audioCtx.resume();
+
+            }
+
+        }
+
+        window.addEventListener('click', initAudio);
+
+        window.addEventListener('keydown', initAudio);
+
+
+
+        function triggerAudioAlert() {
+
+            initAudio();
+
+            const now = Date.now();
+
+            if (now - lastAlertTime > 1200) {
+
+                if (audioCtx && audioCtx.state === 'running') {
+
+                    const osc = audioCtx.createOscillator();
+
+                    const gain = audioCtx.createGain();
+
+                   
+
+                    osc.type = 'sawtooth';
+
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+                   
+
+                    osc.connect(gain);
+
+                    gain.connect(audioCtx.destination);
+
+                   
+
+                    osc.start();
+
+                    osc.stop(audioCtx.currentTime + 0.25);
+
+                }
+
+                lastAlertTime = now;
+
+            }
+
+        }
+
+
+
+        function calcAngle(a, b, c) {
+
+            let radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+
+            let angle = Math.abs((radians * 180.0) / Math.PI);
+
+            return angle > 180.0 ? 360 - angle : angle;
+
+        }
+
+
+
+        function checkVisibility(landmarks, indices, minConfidence = 0.5) {
+
+            return indices.every(idx => landmarks[idx] && landmarks[idx].visibility >= minConfidence);
+
+        }
+
+
+
+        function evaluateForm(landmarks, exercise) {
+
+            let isFaulty = false;
+
+            let message = "GOOD FORM";
+
+            let a1 = 0, a2 = 0;
+
+            let label1 = "Angle 1", label2 = "Angle 2";
+
+
+
+            switch (exercise) {
+
+                case 'squat':
+
+                    label1 = "Knee Flex"; label2 = "Hip Flex";
+
+                    if (!checkVisibility(landmarks, [11, 23, 25, 27])) {
+
+                        return { isFaulty: true, message: "STEP BACK: LOWER BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[23], landmarks[25], landmarks[27]));
+
+                    a2 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[25]));
+
+                   
+
+                    if (landmarks[25].x > landmarks[27].x + 0.12) { isFaulty = true; message = "KNEES TOO FAR OVER TOES"; }
+
+
+
+                    if (a1 < 105) { exerciseStage = "DOWN"; }
+
+                    if (a1 > 155 && exerciseStage === "DOWN") {
+
+                        repCount++;
+
+                        exerciseStage = "UP";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'bicep_curl':
+
+                    label1 = "Elbow Flex"; label2 = "Elbow Drift";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15])) {
+
+                        return { isFaulty: true, message: "STEP BACK: ARM NOT VISIBLE", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(Math.abs(landmarks[11].x - landmarks[13].x) * 100);
+
+                   
+
+                    if (a2 > 10) { isFaulty = true; message = "ELBOW DRIFTING"; }
+
+
+
+                    if (a1 < 50) { exerciseStage = "UP"; }
+
+                    if (a1 > 140 && exerciseStage === "UP") {
+
+                        repCount++;
+
+                        exerciseStage = "DOWN";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'pushup':
+
+                    label1 = "Elbow Flex"; label2 = "Body Line";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15, 23, 27])) {
+
+                        return { isFaulty: true, message: "STEP BACK: FULL BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[27]));
+
+                   
+
+                    if (a2 < 150) { isFaulty = true; message = "HIPS SAGGING / ARCHED"; }
+
+
+
+                    if (a1 < 100) { exerciseStage = "DOWN"; }
+
+                    if (a1 > 150 && exerciseStage === "DOWN") {
+
+                        repCount++;
+
+                        exerciseStage = "UP";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'bench_press':
+
+                    label1 = "Elbow Flex"; label2 = "Wrist Flare";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15])) {
+
+                        return { isFaulty: true, message: "STEP BACK: UPPER BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(Math.abs(landmarks[15].x - landmarks[13].x) * 100);
+
+                   
+
+                    if (a2 > 15) { isFaulty = true; message = "WRISTS UNALIGNED"; }
+
+
+
+                    if (a1 < 90) { exerciseStage = "DOWN"; }
+
+                    if (a1 > 150 && exerciseStage === "DOWN") {
+
+                        repCount++;
+
+                        exerciseStage = "UP";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'cable_fly':
+
+                    label1 = "Elbow Angle"; label2 = "Chest Lock";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15, 23])) {
+
+                        return { isFaulty: true, message: "STEP BACK: UPPER BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(calcAngle(landmarks[23], landmarks[11], landmarks[13]));
+
+                   
+
+                    if (a1 < 110) { isFaulty = true; message = "ARMS BENT TOO MUCH"; }
+
+                   
+
+                    if (a2 < 45) { exerciseStage = "CLOSED"; }
+
+                    if (a2 > 65 && exerciseStage === "CLOSED") {
+
+                        repCount++;
+
+                        exerciseStage = "OPEN";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'tricep_extension':
+
+                    label1 = "Elbow Extension"; label2 = "Shoulder Sway";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15])) {
+
+                        return { isFaulty: true, message: "STEP BACK: ARM NOT VISIBLE", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(Math.abs(landmarks[11].y - landmarks[13].y) * 100);
+
+                   
+
+                    if (a2 > 12) { isFaulty = true; message = "UPPER ARM MOVING"; }
+
+
+
+                    if (a1 > 150) { exerciseStage = "EXTENDED"; }
+
+                    if (a1 < 80 && exerciseStage === "EXTENDED") {
+
+                        repCount++;
+
+                        exerciseStage = "FLEXED";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'overhead_press':
+
+                    label1 = "Press Angle"; label2 = "Spine Arch";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15, 23, 25])) {
+
+                        return { isFaulty: true, message: "STEP BACK: UPPER BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                    a2 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[25]));
+
+                   
+
+                    if (a2 < 155) { isFaulty = true; message = "BACK ARCHING"; }
+
+
+
+                    if (a1 > 150) { exerciseStage = "UP"; }
+
+                    if (a1 < 90 && exerciseStage === "UP") {
+
+                        repCount++;
+
+                        exerciseStage = "DOWN";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'lateral_raise':
+
+                    label1 = "Raise Angle"; label2 = "Elbow Lock";
+
+                    if (!checkVisibility(landmarks, [11, 13, 15, 23])) {
+
+                        return { isFaulty: true, message: "STEP BACK: UPPER BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[23], landmarks[11], landmarks[13]));
+
+                    a2 = Math.round(calcAngle(landmarks[11], landmarks[13], landmarks[15]));
+
+                   
+
+                    if (a1 > 105) { isFaulty = true; message = "LIFTING PAST SHOULDERS"; }
+
+
+
+                    if (a1 > 75) { exerciseStage = "RAISED"; }
+
+                    if (a1 < 30 && exerciseStage === "RAISED") {
+
+                        repCount++;
+
+                        exerciseStage = "LOWERED";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'shrugs':
+
+                    label1 = "Ear-Shoulder Dist"; label2 = "Torso Flex";
+
+                    if (!checkVisibility(landmarks, [7, 11, 23, 25])) {
+
+                        return { isFaulty: true, message: "STEP BACK: SHOULDERS NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(Math.abs(landmarks[11].y - landmarks[7].y) * 100);
+
+                    a2 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[25]));
+
+                   
+
+                    if (a2 < 160) { isFaulty = true; message = "KEEP TORSO UPRIGHT"; }
+
+
+
+                    if (a1 < 9) { exerciseStage = "SHRUGGED"; }
+
+                    if (a1 > 13 && exerciseStage === "SHRUGGED") {
+
+                        repCount++;
+
+                        exerciseStage = "RELEASED";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                case 'plank':
+
+                    label1 = "Body Alignment"; label2 = "Hip Position";
+
+                    if (!checkVisibility(landmarks, [11, 23, 27])) {
+
+                        return { isFaulty: true, message: "STEP BACK: FULL BODY NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[27]));
+
+                    a2 = Math.round(calcAngle(landmarks[23], landmarks[25], landmarks[27]));
+
+                   
+
+                    if (a1 < 155 || a1 > 195) { isFaulty = true; message = "ADJUST HIP LEVEL"; }
+
+                    break;
+
+
+
+                case 'crunches':
+
+                    label1 = "Core Flexion"; label2 = "Hip Angle";
+
+                    if (!checkVisibility(landmarks, [11, 23, 25])) {
+
+                        return { isFaulty: true, message: "STEP BACK: TORSO NEEDED", a1: 0, a2: 0 };
+
+                    }
+
+                    a1 = Math.round(calcAngle(landmarks[11], landmarks[23], landmarks[25]));
+
+                    a2 = Math.round(calcAngle(landmarks[23], landmarks[25], landmarks[27]));
+
+                   
+
+                    if (a1 < 135) { exerciseStage = "FLEXED"; }
+
+                    if (a1 > 155 && exerciseStage === "FLEXED") {
+
+                        repCount++;
+
+                        exerciseStage = "REST";
+
+                        updateReps();
+
+                    }
+
+                    break;
+
+
+
+                default:
+
+                    message = "SELECT WORKOUT";
+
+            }
+
+
+
+            document.getElementById('label1').innerText = label1 + ":";
+
+            document.getElementById('label2').innerText = label2 + ":";
+
+            document.getElementById('stageText').innerText = "Stage: " + (exerciseStage || "NONE");
+
+
+
+            return { isFaulty, message, a1, a2 };
+
+        }
+
+
+
+        function updateReps() {
+
+            document.getElementById('repCounter').innerText = repCount;
+
+        }
+
+
+
+        function onResults(results) {
+
+            canvasElement.width = canvasElement.clientWidth;
+
+            canvasElement.height = canvasElement.clientHeight;
+
+
+
+            canvasCtx.save();
+
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+
+
+            if (results.poseLandmarks) {
+
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#38bdf8', lineWidth: 3});
+
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#f43f5e', lineWidth: 2, radius: 4});
+
+
+
+                const currentExercise = document.getElementById('exerciseSelect').value;
+
+                const evalRes = evaluateForm(results.poseLandmarks, currentExercise);
+
+
+
+                document.getElementById('angle1').innerText = evalRes.a1 + "°";
+
+                document.getElementById('angle2').innerText = evalRes.a2 + "°";
+
+                document.getElementById('analysisOutput').innerText = evalRes.message;
+
+
+
+                const statusBadge = document.getElementById('statusBadge');
+
+                if (evalRes.isFaulty) {
+
+                    statusBadge.className = "status-pill faulty";
+
+                    document.getElementById('statusText').innerText = "STATUS: FAULTY (" + currentExercise.replace('_', ' ').toUpperCase() + ")";
+
+                    document.getElementById('analysisOutput').style.color = "#f87171";
+
+                    triggerAudioAlert();
+
+                } else {
+
+                    statusBadge.className = "status-pill good";
+
+                    document.getElementById('statusText').innerText = "STATUS: GOOD (" + currentExercise.replace('_', ' ').toUpperCase() + ")";
+
+                    document.getElementById('analysisOutput').style.color = "#4ade80";
+
+                }
+
+            }
+
+            canvasCtx.restore();
+
+        }
+
+
+
+        const pose = new Pose({
+
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+
+        });
+
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6 });
+
+        pose.onResults(onResults);
+
+
+
+        const camera = new Camera(videoElement, {
+
+            onFrame: async () => { await pose.send({ image: videoElement }); },
+
+            width: 640, height: 480
+
+        });
+
+        camera.start();
+
+
+
+        function switchExercise() {
+
+            resetMetrics();
+
+            updateGuidanceUI();
+
+        }
+
+
+
+        function updateGuidanceUI() {
+
+            const currentEx = document.getElementById('exerciseSelect').value;
+
+            const tips = GUIDANCE_TIPS[currentEx] || ["Follow proper form."];
+
+            const listContainer = document.getElementById('guidanceList');
+
+            listContainer.innerHTML = tips.map(tip => `<li>${tip}</li>`).join('');
+
+        }
+
+
+
+        function resetMetrics() {
+
+            repCount = 0;
+
+            exerciseStage = null;
+
+            document.getElementById('repCounter').innerText = "0";
+
+            document.getElementById('stageText').innerText = "Stage: NONE";
+
+        }
+
+
+
+        updateGuidanceUI();
+
+    </script>
+
+</body>
+
+</html>
