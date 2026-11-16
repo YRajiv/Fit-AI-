@@ -4,6 +4,7 @@ from . import views
 app_name = 'progress'
 
 urlpatterns = [
+    path('api/summary/', views.progress_summary_api, name='api_summary'),
     path('', views.progress_page, name='progress'),
     path('update-steps/', views.update_steps, name='update_steps'),
     path('update-goal/', views.update_step_goal, name='update_step_goal'),

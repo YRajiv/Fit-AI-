@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 from workouts.models import Workout
@@ -162,6 +162,90 @@ def get_today_diet_meals(user, today):
         meals = []
 
     return normalize_diet_meals(meals)
+
+
+
+# ==============================================================
+# DASHBOARD SUMMARY API
+# ==============================================================
+
+@require_GET
+def dashboard_summary_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'success': False,
+            'message': 'Authentication required.'
+        }, status=401)
+
+    user = request.user
+    today, tomorrow, today_start, tomorrow_start = (
+        get_today_datetime_range()
+    )
+
+    # Daily progress steps & activity
+    daily_progress = DailyProgress.objects.filter(
+        user=user,
+        date=today
+    ).first()
+
+    steps = daily_progress.steps if daily_progress else 0
+    steps_goal = daily_progress.steps_goal if daily_progress else 8000
+    active_minutes = daily_progress.active_minutes if daily_progress else 0
+    distance_km = round(daily_progress.distance_km, 2) if daily_progress else 0.0
+    activity_calories = round(daily_progress.activity_calories, 1) if daily_progress else 0.0
+
+    # User profile & weight
+    profile = UserFitnessProfile.objects.filter(user=user).first()
+    weight = (
+        daily_progress.weight_kg
+        if daily_progress and daily_progress.weight_kg is not None
+        else profile.weight_kg if profile else None
+    )
+
+    # Today's consumed nutrition
+    food_data = FoodScan.objects.filter(
+        user=user,
+        is_consumed=True,
+        scan_date__gte=today_start,
+        scan_date__lt=tomorrow_start
+    ).aggregate(
+        total_protein=Sum('protein'),
+        total_calories=Sum('calories')
+    )
+    consumed_protein = round(float(food_data['total_protein'] or 0), 1)
+    consumed_calories = round(float(food_data['total_calories'] or 0), 1)
+
+    # Today's water intake
+    water_record = WaterIntake.objects.filter(
+        user=user,
+        date=today
+    ).first()
+    water_amount = round(float(water_record.water_amount), 1) if water_record else 0.0
+    water_target = round(float(water_record.target_amount), 1) if water_record else 3.0
+
+    # Today's diet meals from weekly plan
+    today_diet_meals = get_today_diet_meals(user, today)
+    planned_protein = round(
+        sum(float(meal.get('protein', 0) or 0) for meal in today_diet_meals),
+        1
+    )
+
+    return JsonResponse({
+        'success': True,
+        'steps': steps,
+        'steps_goal': steps_goal,
+        'active_minutes': active_minutes,
+        'distance_km': distance_km,
+        'activity_calories': activity_calories,
+        'consumed_calories': consumed_calories,
+        'consumed_protein': consumed_protein,
+        'planned_protein': planned_protein,
+        'water_amount': water_amount,
+        'water_target': water_target,
+        'weight_kg': weight,
+        'day_name': today.strftime("%A"),
+        'today_diet_meals': today_diet_meals,
+    })
 
 
 # ==============================================================

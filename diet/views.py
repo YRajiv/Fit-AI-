@@ -8,6 +8,7 @@ import datetime
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from django.contrib.auth.decorators import login_required
 
 from google import genai
@@ -1017,6 +1018,85 @@ def diet_dashboard_view(request):
         context
 
     )
+
+
+
+# ============================================================
+# DIET PLAN API
+# ============================================================
+
+@require_GET
+def diet_plan_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'success': False,
+            'message': 'Authentication required.'
+        }, status=401)
+
+    profile = UserFitnessProfile.objects.filter(
+        user=request.user
+    ).first()
+
+    if profile is None:
+        return JsonResponse({
+            'success': True,
+            'has_profile': False,
+            'profile': None,
+            'weekly_plan': None,
+        })
+
+    try:
+        bmi_data = calculate_bmi(profile)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+    plan_obj = WeeklyDietPlan.objects.filter(
+        user=request.user
+    ).last()
+
+    plan_data = {}
+
+    if not plan_obj:
+        try:
+            ai_plan = generate_ai_diet_plan(profile, bmi_data)
+            validate_diet_plan(ai_plan)
+            plan_data = prepare_plan_for_template(ai_plan)
+            plan_obj = WeeklyDietPlan.objects.create(
+                user=request.user,
+                plan_json=plan_data
+            )
+        except Exception:
+            ai_plan = create_fallback_diet_plan()
+            plan_data = prepare_plan_for_template(ai_plan)
+            plan_obj = WeeklyDietPlan.objects.create(
+                user=request.user,
+                plan_json=plan_data
+            )
+    else:
+        existing_plan = plan_obj.plan_json
+        if existing_plan:
+            first_day = existing_plan.get("Monday", [])
+            if isinstance(first_day, list):
+                plan_data = prepare_plan_for_template(existing_plan)
+                plan_obj.plan_json = plan_data
+                plan_obj.save(update_fields=["plan_json"])
+            else:
+                plan_data = existing_plan
+
+    return JsonResponse({
+        'success': True,
+        'has_profile': True,
+        'profile': {
+            'height_cm': profile.height_cm,
+            'weight_kg': profile.weight_kg,
+            'bmi': bmi_data['bmi'],
+            'bmi_category': bmi_data['bmi_category'],
+        },
+        'weekly_plan': plan_data,
+    })
 
 
 # ============================================================

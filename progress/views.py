@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils import timezone
 from django.db.models import Sum
@@ -21,6 +21,56 @@ from diet.models import UserFitnessProfile
 # ============================================================
 # PROGRESS PAGE
 # ============================================================
+
+@require_GET
+def progress_summary_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            'success': False,
+            'message': 'Authentication required.'
+        }, status=401)
+
+    today = timezone.localdate()
+    daily_progress = DailyProgress.objects.filter(
+        user=request.user,
+        date=today
+    ).first()
+
+    profile = UserFitnessProfile.objects.filter(
+        user=request.user
+    ).first()
+
+    weight = (
+        daily_progress.weight_kg
+        if daily_progress and daily_progress.weight_kg is not None
+        else profile.weight_kg if profile else None
+    )
+
+    weekly_progress = [
+        {
+            'date': item.date.strftime('%a'),
+            'steps': item.steps,
+            'distance': round(item.distance_km, 2),
+            'active_minutes': item.active_minutes
+        }
+        for item in DailyProgress.objects.filter(
+            user=request.user,
+            date__gte=today - timedelta(days=6),
+            date__lte=today
+        ).order_by('date')
+    ]
+
+    return JsonResponse({
+        'success': True,
+        'steps': daily_progress.steps if daily_progress else 0,
+        'steps_goal': daily_progress.steps_goal if daily_progress else 8000,
+        'distance_km': round(daily_progress.distance_km, 2) if daily_progress else 0,
+        'active_minutes': daily_progress.active_minutes if daily_progress else 0,
+        'calories_burned': round(daily_progress.activity_calories, 1) if daily_progress else 0,
+        'weight_kg': weight,
+        'weekly_progress': weekly_progress
+    })
+
 
 @login_required
 @ensure_csrf_cookie

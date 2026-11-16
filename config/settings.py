@@ -53,6 +53,28 @@ if RENDER_EXTERNAL_HOSTNAME:
         f'https://{RENDER_EXTERNAL_HOSTNAME}'
     )
 
+VERCEL_FRONTEND_ORIGIN = os.getenv(
+    'VERCEL_FRONTEND_ORIGIN',
+    ''
+).strip().rstrip('/')
+
+if VERCEL_FRONTEND_ORIGIN:
+    CSRF_TRUSTED_ORIGINS.append(VERCEL_FRONTEND_ORIGIN)
+
+CORS_ALLOWED_ORIGINS = []
+
+if DEBUG:
+    CORS_ALLOWED_ORIGINS.extend([
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ])
+    CSRF_TRUSTED_ORIGINS.extend(CORS_ALLOWED_ORIGINS)
+
+if VERCEL_FRONTEND_ORIGIN:
+    CORS_ALLOWED_ORIGINS.append(VERCEL_FRONTEND_ORIGIN)
+
+CORS_ALLOW_CREDENTIALS = True
+
 
 # Applications
 INSTALLED_APPS = [
@@ -62,6 +84,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
 
     'users',
     'workouts',
@@ -78,6 +101,7 @@ INSTALLED_APPS = [
 # Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 
     # WhiteNoise for static files
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -214,6 +238,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 
 CSRF_COOKIE_SECURE = not DEBUG
+
+if VERCEL_FRONTEND_ORIGIN and not DEBUG:
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
 
 
 # Default primary key field type

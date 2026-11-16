@@ -6,6 +6,12 @@ app_name = "workout"
 
 urlpatterns = [
     path(
+        "api/recommendation/",
+        views.workout_recommendation_api,
+        name="api_recommendation"
+    ),
+
+    path(
         "",
         views.workouts_view,
         name="workouts"

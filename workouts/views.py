@@ -2,7 +2,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
 from django.db import transaction
 from math import isfinite
@@ -631,6 +631,27 @@ def recommend_workout(profile, user):
         "training_days": profile.training_days,
 
     }
+
+
+@require_GET
+def workout_recommendation_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            "status": "error",
+            "message": "Authentication required."
+        }, status=401)
+
+    profile = UserFitnessProfile.objects.filter(
+        user=request.user
+    ).first()
+
+    if profile is None:
+        return JsonResponse({
+            "status": "error",
+            "message": "Please complete your fitness profile first."
+        }, status=404)
+
+    return JsonResponse(recommend_workout(profile, request.user))
 
 
 # ============================================================

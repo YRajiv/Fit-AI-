@@ -17,4 +17,10 @@ urlpatterns = [
         views.save_profile_api,
         name='save_profile_api'
     ),
+
+    path(
+        'api/plan/',
+        views.diet_plan_api,
+        name='diet_plan_api'
+    ),
 ]
