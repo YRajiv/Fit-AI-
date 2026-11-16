@@ -646,6 +646,20 @@
 
             </form>
 
+            <form
+                method="POST"
+                action="{% url 'workout:complete_workout' workout_id=0 %}"
+                id="completeWorkoutForm"
+                hidden>
+
+                {% csrf_token %}
+
+                <button type="submit" class="start-btn">
+                    Complete Workout
+                </button>
+
+            </form>
+
             <a href="{% url 'workout:workouts' %}" class="back-btn">
                 Change Assessment
             </a>
@@ -766,6 +780,9 @@ if (hasEquipment) {
 // Start Workout AJAX functionality
 
 const startWorkoutForm = document.getElementById("startWorkoutForm");
+const completeWorkoutForm = document.getElementById("completeWorkoutForm");
+let activeWorkoutId = null;
+let completionInProgress = false;
 
 if (startWorkoutForm) {
 
@@ -796,36 +813,110 @@ if (startWorkoutForm) {
 
             const data = await response.json();
 
-            if (data.status === "success") {
+            if (
+                !response.ok ||
+                data.status !== "success" ||
+                !Number.isInteger(data.workout_id) ||
+                data.workout_id < 1
+            ) {
 
-                message.innerHTML =
-                    "<div class='message' style='background:rgba(34,197,94,0.12);color:#86efac;margin-top:20px;'>" +
-                    data.message +
-                    "</div>";
-
-                button.textContent = "Workout Started";
-
-            } else {
-
-                message.innerHTML =
-                    "<div class='message error'>" +
-                    data.message +
-                    "</div>";
-
-                button.disabled = false;
-
-                button.textContent = "Start Workout";
+                throw new Error(
+                    data.message || "Unable to start your workout."
+                );
 
             }
+
+            activeWorkoutId = data.workout_id;
+            completeWorkoutForm.action = completeWorkoutForm.action.replace(
+                /\/0\/$/,
+                "/" + activeWorkoutId + "/"
+            );
+            completeWorkoutForm.hidden = false;
+
+            message.innerHTML =
+                "<div class='message' style='background:rgba(34,197,94,0.12);color:#86efac;margin-top:20px;'>" +
+                data.message +
+                "</div>";
+
+            button.textContent = "Workout Started";
 
         } catch (error) {
 
             message.innerHTML =
-                "<div class='message error'>Something went wrong. Please try again.</div>";
+                "<div class='message error'>" +
+                (error.message || "Something went wrong. Please try again.") +
+                "</div>";
 
             button.disabled = false;
 
             button.textContent = "Start Workout";
+
+        }
+
+    });
+
+}
+
+if (completeWorkoutForm) {
+
+    completeWorkoutForm.addEventListener("submit", async function(event) {
+
+        event.preventDefault();
+
+        if (!activeWorkoutId || completionInProgress) {
+            return;
+        }
+
+        const button = completeWorkoutForm.querySelector("button");
+        const message = document.getElementById("workoutMessage");
+        const csrfToken = completeWorkoutForm.querySelector(
+            '[name="csrfmiddlewaretoken"]'
+        ).value;
+
+        completionInProgress = true;
+        button.disabled = true;
+        button.textContent = "Completing...";
+
+        try {
+
+            const response = await fetch(
+                completeWorkoutForm.action,
+                {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || data.status !== "success") {
+                throw new Error(
+                    data.message || "Unable to complete your workout."
+                );
+            }
+
+            message.innerHTML =
+                "<div class='message' style='background:rgba(34,197,94,0.12);color:#86efac;margin-top:20px;'>" +
+                data.message +
+                "</div>";
+
+            button.textContent = "Workout Completed";
+
+        } catch (error) {
+
+            message.innerHTML =
+                "<div class='message error'>" +
+                (error.message || "Something went wrong. Please try again.") +
+                "</div>";
+
+            button.disabled = false;
+            button.textContent = "Complete Workout";
+
+        } finally {
+
+            completionInProgress = false;
 
         }
 

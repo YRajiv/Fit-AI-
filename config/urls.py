@@ -22,6 +22,9 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
+    # Chat Assistant must take precedence so /chat/ resolves to the active chatbot UI
+    path('chat/', include('chatbot.urls')),
+
     # Dashboard
     path('', include('dashboard.urls')),
 
@@ -39,9 +42,6 @@ urlpatterns = [
 
     # Workouts
     path('workouts/', include('workouts.urls')),
-
-    # Chat Assistant
-    path('chat/', include('chatbot.urls')),
 
     # Reminders
     path('reminders/', include('reminders.urls')),

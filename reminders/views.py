@@ -263,7 +263,7 @@ def reminders_view(request):
                 "%I:%M %p"
             ),
 
-            "is_active": reminder.is_active,
+            "is_enabled": reminder.is_active,
 
             "food": matched_food,
 
