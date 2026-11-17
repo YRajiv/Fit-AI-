@@ -231,6 +231,9 @@ GEMINI_MODEL = os.getenv(
     'gemini-3.5-flash'
 )
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+# OPENAI AI SETTINGS
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 
 
 # RENDER HTTPS SETTINGS

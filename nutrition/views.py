@@ -1,9 +1,10 @@
-
+import logging
 import base64
 import binascii
 import io
 import json
-import logging
+import openai
+
 import math
 import time
 
@@ -195,259 +196,218 @@ def _save_food_scan(user, image, nutrition_data):
 # FOOD SCAN API
 # ============================================================
 
+
 @require_POST
 def scan_food_view(request):
-    # ---------- Timing start ----------
-    request_start = time.time()
-    # ---------------------------------
-
-
     # STEP 1: Check login
+    request_start = time.time()
 
     if not request.user.is_authenticated:
-        return _error(
-            'Please sign in to scan food.',
-            401
-        )
+        return _error('Please sign in to scan food.', 401)
 
     # STEP 2: Read frontend request
     try:
         data = json.loads(request.body)
     except (UnicodeDecodeError, json.JSONDecodeError):
-        return _error(
-            'Invalid request data.',
-            400
-        )
-    # Log time after request parsing
+        return _error('Invalid request data.', 400)
+
     parse_time = time.time()
-    logger.info('Request JSON parsing time: %.2f s', parse_time - request_start)
-    # ---------- End of timing for step 2 ----------
-
-    try:
-        data = json.loads(request.body)
-
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return _error(
-            'Invalid request data.',
-            400
-        )
+    logger.info(
+        'Request JSON parsing time: %.2f seconds',
+        parse_time - request_start
+    )
 
     if not isinstance(data, dict) or not data.get('image'):
-        return _error(
-            'No image data provided.',
-            400
-        )
+        return _error('No image data provided.', 400)
 
     # STEP 3: Validate image
-
     try:
         image = _nutrition_image(data['image'])
     except ValueError as error:
         return _error(str(error), 400)
 
-    # Log time after image validation
     validation_time = time.time()
-    logger.info('Image validation time: %.2f s', validation_time - parse_time)
-    # ---------- End of timing for step 3 ----------
+    logger.info(
+        'Image validation time: %.2f seconds',
+        validation_time - parse_time
+    )
 
+    # STEP 4: Get Gemini API settings
+    api_key = getattr(settings, 'GEMINI_API_KEY', None)
+
+    model_name = getattr(
+        settings,
+        'GEMINI_MODEL',
+        'gemini-3.8-flash'
+    )
+
+    if not api_key:
+        logger.error('GEMINI_API_KEY is missing.')
+        return _error('Gemini API key is not configured.', 503)
+
+    # STEP 5: Prepare the nutrition analysis prompt
+    prompt = """
+    You are an AI nutrition analysis assistant.
+
+    Analyze the food visible in the provided image.
+
+    Estimate nutrition values for the visible serving.
+
+    Return ONLY a valid JSON object.
+
+    Use exactly these fields:
+
+    {
+        "food_name": "Name of the food",
+        "calories": 250,
+        "protein": 10,
+        "carbs": 30,
+        "fat": 8,
+        "fiber": 4,
+        "sugar": 5,
+        "ai_tip": "A short helpful nutrition tip"
+    }
+
+    Rules:
+    - Calories must be in kcal.
+    - Protein, carbs, fat, fiber and sugar must be in grams.
+    - All nutrition values must be numbers.
+    - Do not include Markdown.
+    - Do not include explanations outside JSON.
+    - Estimate values carefully.
+    - Do not claim exact serving weight if it cannot be identified.
+    """
+
+    # STEP 6: Initialize Gemini
     try:
-        image = _nutrition_image(data['image'])
-
-    except ValueError as error:
-        return _error(str(error), 400)
-
-    try:
-
-        # STEP 4: Gemini configuration
-
-        api_key = getattr(
-            settings,
-            'GEMINI_API_KEY',
-            None
-        )
-
-        model_name = getattr(
-            settings,
-            'GEMINI_MODEL',
-            'gemini-3.8-flash'
-        )
-
-        if not api_key:
-
-            logger.error('GEMINI_API_KEY is missing.')
-
-            return _error(
-                'Gemini API key is not configured.',
-                503
-            )
-
-        # STEP 5: Gemini prompt
-
-        prompt = """
-        You are an AI nutrition analysis assistant.
-
-        Analyze the food visible in the provided image.
-
-        Estimate the nutrition values for the visible serving.
-
-        Return ONLY a valid JSON object.
-
-        Use exactly these fields:
-
-        {
-            "food_name": "Name of the food",
-            "calories": 250,
-            "protein": 10,
-            "carbs": 30,
-            "fat": 8,
-            "fiber": 4,
-            "sugar": 5,
-            "ai_tip": "A short helpful nutrition tip"
-        }
-
-        Rules:
-        - Calories must be in kcal.
-        - Protein, carbs, fat, fiber and sugar must be in grams.
-        - All nutrition values must be numbers.
-        - Do not include Markdown.
-        - Do not include explanations outside JSON.
-        - Estimate values carefully.
-        - Do not claim exact serving weight if it cannot be identified.
-        """
-
-        # STEP 6: Send image to Gemini
-
         client = genai.Client(api_key=api_key)
+    except Exception:
+        logger.exception('Gemini client initialization failed.')
+        return _error('Gemini could not be initialized.', 503)
 
-        # Define fallback model order: primary (from settings), then two alternatives
-        fallback_models = [model_name, "gemini-3.8-flash", "gemini-3.5-flash-lite"]
-        # Ensure we don't repeat the primary if it already matches an alternative
-        fallback_models = list(dict.fromkeys(fallback_models))
+    # STEP 7: Analyze image using Gemini
+    fallback_models = list(dict.fromkeys([
+        model_name,
+        'gemini-3.8-flash',
+        'gemini-3.5-flash-lite'
+    ]))
 
-        response = None
-        used_model = None
-        for m in fallback_models:
-            used_model = m
-            max_attempts = 3
-            for attempt in range(max_attempts):
-                try:
-                    response = client.models.generate_content(
-                        model=m,
-                        contents=[image, prompt],
-                        config=types.GenerateContentConfig(
-                            response_mime_type='application/json',
-                            temperature=0.2
-                        )
-                    )
-                    # Successful call, break out of both loops
-                    break
-                except Exception as error:
-                    error_message = str(error).upper()
-                    logger.exception('Gemini food scan failed. Model: %s, attempt %s', m, attempt + 1)
+    response = None
+    used_model = None
+    last_error = None
 
-                    # Temporary 503 / UNAVAILABLE → exponential backoff
-                    if attempt < max_attempts - 1 and (
-                        '503' in error_message or 'UNAVAILABLE' in error_message
-                    ):
-                        backoff_seconds = 2 * (2 ** attempt)
-                        time.sleep(backoff_seconds)
-                        continue
-                    # If last attempt for this model and still a 503/UNAVAILABLE, fall through to try next model
-                    if '503' in error_message or 'UNAVAILABLE' in error_message:
-                        break
-
-                    # Rate limiting / quota exhausted – do not retry or fallback
-                    if '429' in error_message or 'RESOURCE_EXHAUSTED' in error_message:
-                        return _error(
-                            'Gemini API quota exceeded. Please try again later.',
-                            429
-                        )
-
-                    # Permanent errors – abort entirely
-                    if 'API_KEY' in error_message or 'INVALID_ARGUMENT' in error_message or 'NOT_FOUND' in error_message:
-                        return _error(
-                            'Gemini could not analyze your image. Please try again.',
-                            502
-                        )
-
-                    # Fallback for any other error
-                    return _error(
-                        'Gemini could not analyze your image. Please try again.',
-                        502
-                    )
-            # If we got a successful response, exit the fallback loop
-            if response and getattr(response, 'text', None):
-                break
-        # End of fallback attempts
-        if response and getattr(response, 'text', None):
-            logger.info('Gemini analysis succeeded with model %s', used_model)
-
-
-        # If all attempts exhausted without a successful response
-        if response is None:
-            return _error(
-                'Gemini is temporarily unavailable. Please try again in a few moments.',
-                503
-            )
-
-        if not response or not response.text:
-
-            return _error(
-                'Gemini returned an empty response. Please scan again.',
-                502
-            )
-
-        nutrition_data = _parse_nutrition(
-            response.text
-        )
-
-        # STEP 8: Save food and image
+    for current_model in fallback_models:
+        gemini_start = time.time()
 
         try:
-
-            _save_food_scan(
-                request.user,
-                image,
-                nutrition_data
+            response = client.models.generate_content(
+                model=current_model,
+                contents=[image, prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    temperature=0.2
+                )
             )
 
-        except Exception:
+            gemini_elapsed = time.time() - gemini_start
+
+            logger.info(
+                'Gemini response time: %.2f seconds using %s',
+                gemini_elapsed,
+                current_model
+            )
+
+            if response and getattr(response, 'text', None):
+                used_model = current_model
+                break
+
+            logger.warning(
+                'Empty Gemini response from model %s',
+                current_model
+            )
+
+        except Exception as error:
+            last_error = error
+            error_message = str(error).upper()
 
             logger.exception(
-                'Could not save food scan to database.'
+                'Gemini request failed using model %s',
+                current_model
             )
 
-            return _error(
-                'Food was analyzed, but saving the result failed.',
-                500
-            )
+            # Quota exceeded: do not keep calling other models
+            if (
+                '429' in error_message
+                or 'RESOURCE_EXHAUSTED' in error_message
+            ):
+                return _error(
+                    'Gemini API quota exceeded. Please try again later.',
+                    429
+                )
 
-        # STEP 9: Return response
+            # Temporary service failure: try next model
+            if (
+                '503' in error_message
+                or 'UNAVAILABLE' in error_message
+            ):
+                continue
 
-        return JsonResponse({
-            'success': True,
-            'nutrition': nutrition_data
-        })
+            # Invalid API key
+            if 'API_KEY' in error_message:
+                return _error(
+                    'Gemini API key is invalid or unavailable.',
+                    503
+                )
 
-    except ValueError as error:
+            # Try the next model for other model-specific errors
+            continue
 
-        logger.warning(
-            'Nutrition response validation failed: %s',
-            error
+    if not response or not getattr(response, 'text', None):
+        logger.error(
+            'All Gemini models failed. Last error: %s',
+            last_error
+        )
+        return _error(
+            'Gemini could not analyze your image. Please try again later.',
+            503
         )
 
-        return _error(str(error), 502)
+    logger.info(
+        'Food analysis succeeded using model %s',
+        used_model
+    )
+
+    # STEP 8: Parse Gemini nutrition response
+    try:
+        nutrition_data = _parse_nutrition(response.text)
 
     except Exception:
-
-        logger.exception(
-            'Unexpected nutrition scanning error.'
+        logger.exception('Nutrition response parsing failed.')
+        return _error(
+            'Gemini returned invalid nutrition data. Please scan again.',
+            502
         )
 
+    # STEP 9: Save food and image to database
+    try:
+        _save_food_scan(
+            request.user,
+            image,
+            nutrition_data
+        )
+
+    except Exception:
+        logger.exception('Could not save food scan to database.')
         return _error(
-            'Something went wrong while analyzing your food.',
+            'Food was analyzed, but saving the result failed.',
             500
         )
 
-    finally:
-        image.close()
+    # STEP 10: Return successful response
+    return JsonResponse({
+        'success': True,
+        'nutrition': nutrition_data
+    })
+
+
+

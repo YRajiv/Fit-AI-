@@ -164,7 +164,15 @@ def profile(request):
     return render(request, 'users/profile.html', {'profile_form': profile_form})
 
 
+@require_POST
+def post_logout(request):
+    logout(request)
+    return redirect('users:login')
+
+# Preserve original for compatibility (GET request)
 def logout_view(request):
+    logout(request)
+    return redirect('users:login')
     logout(request)
     return redirect('users:login')
 
