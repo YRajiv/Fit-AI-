@@ -230,6 +230,7 @@ GEMINI_MODEL = os.getenv(
     'GEMINI_MODEL',
     'gemini-3.5-flash'
 )
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 
 # RENDER HTTPS SETTINGS

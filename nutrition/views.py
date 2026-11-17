@@ -197,6 +197,10 @@ def _save_food_scan(user, image, nutrition_data):
 
 @require_POST
 def scan_food_view(request):
+    # ---------- Timing start ----------
+    request_start = time.time()
+    # ---------------------------------
+
 
     # STEP 1: Check login
 
@@ -207,6 +211,17 @@ def scan_food_view(request):
         )
 
     # STEP 2: Read frontend request
+    try:
+        data = json.loads(request.body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return _error(
+            'Invalid request data.',
+            400
+        )
+    # Log time after request parsing
+    parse_time = time.time()
+    logger.info('Request JSON parsing time: %.2f s', parse_time - request_start)
+    # ---------- End of timing for step 2 ----------
 
     try:
         data = json.loads(request.body)
@@ -224,6 +239,16 @@ def scan_food_view(request):
         )
 
     # STEP 3: Validate image
+
+    try:
+        image = _nutrition_image(data['image'])
+    except ValueError as error:
+        return _error(str(error), 400)
+
+    # Log time after image validation
+    validation_time = time.time()
+    logger.info('Image validation time: %.2f s', validation_time - parse_time)
+    # ---------- End of timing for step 3 ----------
 
     try:
         image = _nutrition_image(data['image'])
@@ -294,56 +319,76 @@ def scan_food_view(request):
 
         client = genai.Client(api_key=api_key)
 
+        # Define fallback model order: primary (from settings), then two alternatives
+        fallback_models = [model_name, "gemini-3.8-flash", "gemini-3.5-flash-lite"]
+        # Ensure we don't repeat the primary if it already matches an alternative
+        fallback_models = list(dict.fromkeys(fallback_models))
+
         response = None
-
-        for attempt in range(2):
-
-            try:
-
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[image, prompt],
-                    config=types.GenerateContentConfig(
-                        response_mime_type='application/json',
-                        temperature=0.2
+        used_model = None
+        for m in fallback_models:
+            used_model = m
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    response = client.models.generate_content(
+                        model=m,
+                        contents=[image, prompt],
+                        config=types.GenerateContentConfig(
+                            response_mime_type='application/json',
+                            temperature=0.2
+                        )
                     )
-                )
+                    # Successful call, break out of both loops
+                    break
+                except Exception as error:
+                    error_message = str(error).upper()
+                    logger.exception('Gemini food scan failed. Model: %s, attempt %s', m, attempt + 1)
 
-                break
+                    # Temporary 503 / UNAVAILABLE → exponential backoff
+                    if attempt < max_attempts - 1 and (
+                        '503' in error_message or 'UNAVAILABLE' in error_message
+                    ):
+                        backoff_seconds = 2 * (2 ** attempt)
+                        time.sleep(backoff_seconds)
+                        continue
+                    # If last attempt for this model and still a 503/UNAVAILABLE, fall through to try next model
+                    if '503' in error_message or 'UNAVAILABLE' in error_message:
+                        break
 
-            except Exception as error:
+                    # Rate limiting / quota exhausted – do not retry or fallback
+                    if '429' in error_message or 'RESOURCE_EXHAUSTED' in error_message:
+                        return _error(
+                            'Gemini API quota exceeded. Please try again later.',
+                            429
+                        )
 
-                error_message = str(error).upper()
+                    # Permanent errors – abort entirely
+                    if 'API_KEY' in error_message or 'INVALID_ARGUMENT' in error_message or 'NOT_FOUND' in error_message:
+                        return _error(
+                            'Gemini could not analyze your image. Please try again.',
+                            502
+                        )
 
-                logger.exception(
-                    'Gemini food scan failed. Model: %s',
-                    model_name
-                )
-
-                if (
-                    attempt == 0
-                    and (
-                        '503' in error_message
-                        or 'UNAVAILABLE' in error_message
-                    )
-                ):
-
-                    time.sleep(2)
-                    continue
-
-                if '429' in error_message:
-
+                    # Fallback for any other error
                     return _error(
-                        'Gemini API quota exceeded. Please try again later.',
-                        429
+                        'Gemini could not analyze your image. Please try again.',
+                        502
                     )
+            # If we got a successful response, exit the fallback loop
+            if response and getattr(response, 'text', None):
+                break
+        # End of fallback attempts
+        if response and getattr(response, 'text', None):
+            logger.info('Gemini analysis succeeded with model %s', used_model)
 
-                return _error(
-                    'Gemini could not analyze your image. Please try again.',
-                    502
-                )
 
-        # STEP 7: Read Gemini response
+        # If all attempts exhausted without a successful response
+        if response is None:
+            return _error(
+                'Gemini is temporarily unavailable. Please try again in a few moments.',
+                503
+            )
 
         if not response or not response.text:
 
