@@ -3,7 +3,7 @@ import base64
 import binascii
 import io
 import json
-import openai
+
 
 import math
 import time
@@ -19,6 +19,9 @@ from django.views.decorators.http import require_POST
 
 from google import genai
 from google.genai import types
+
+# Import fallback helper utilities
+from .ai_fallback import call_gemini, call_groq, call_openai, fallback_chain
 
 from .models import FoodScan
 
@@ -280,134 +283,116 @@ def scan_food_view(request):
 
     # STEP 6: Initialize Gemini
     try:
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=30_000))
     except Exception:
         logger.exception('Gemini client initialization failed.')
         return _error('Gemini could not be initialized.', 503)
 
-    # STEP 7: Analyze image using Gemini
+    # STEP 7: Analyze image using fallback chain (Gemini -> optional Groq -> OpenAI)
+    # Build the list of provider callables. Gemini will internally try its model fallbacks.
+    fallback_steps: list[tuple[str, callable]] = []
+
+    # Gemini model retries (preserve existing fallback list)
     fallback_models = list(dict.fromkeys([
         model_name,
-        'gemini-3.8-flash',
-        'gemini-3.5-flash-lite'
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
     ]))
-
-    response = None
-    used_model = None
-    last_error = None
-
     for current_model in fallback_models:
-        gemini_start = time.time()
-
-        try:
-            response = client.models.generate_content(
-                model=current_model,
-                contents=[image, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                    temperature=0.2
-                )
+        fallback_steps.append(
+            (
+                f"gemini-{current_model}",
+                lambda m=current_model: call_gemini(
+                    client,
+                    m,
+                    [image, prompt],
+                ),
             )
-
-            gemini_elapsed = time.time() - gemini_start
-
-            logger.info(
-                'Gemini response time: %.2f seconds using %s',
-                gemini_elapsed,
-                current_model
-            )
-
-            if response and getattr(response, 'text', None):
-                used_model = current_model
-                break
-
-            logger.warning(
-                'Empty Gemini response from model %s',
-                current_model
-            )
-
-        except Exception as error:
-            last_error = error
-            error_message = str(error).upper()
-
-            logger.exception(
-                'Gemini request failed using model %s',
-                current_model
-            )
-
-            # Quota exceeded: do not keep calling other models
-            if (
-                '429' in error_message
-                or 'RESOURCE_EXHAUSTED' in error_message
-            ):
-                return _error(
-                    'Gemini API quota exceeded. Please try again later.',
-                    429
-                )
-
-            # Temporary service failure: try next model
-            if (
-                '503' in error_message
-                or 'UNAVAILABLE' in error_message
-            ):
-                continue
-
-            # Invalid API key
-            if 'API_KEY' in error_message:
-                return _error(
-                    'Gemini API key is invalid or unavailable.',
-                    503
-                )
-
-            # Try the next model for other model-specific errors
-            continue
-
-    if not response or not getattr(response, 'text', None):
-        logger.error(
-            'All Gemini models failed. Last error: %s',
-            last_error
-        )
-        return _error(
-            'Gemini could not analyze your image. Please try again later.',
-            503
         )
 
-    logger.info(
-        'Food analysis succeeded using model %s',
-        used_model
-    )
+    # OPTIONAL: Groq vision‑capable model (if configured)
+    groq_vision_model = getattr(settings, "GROQ_VISION_MODEL", None)
+    if groq_vision_model:
+        # Build messages compatible with Groq (OpenAI‑compatible). Assume the model can accept images via the standard spec.
+        groq_messages = [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data['image']}}
+            ]
+        }]
+        fallback_steps.append(("groq", lambda: call_groq(groq_messages, model=groq_vision_model)))
 
-    # STEP 8: Parse Gemini nutrition response
+    # OpenAI vision‑capable fallback (always added if API key present)
+    openai_messages = [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data['image']}}
+        ]
+    }]
+    fallback_steps.append(("openai", lambda: call_openai(openai_messages)))
+
     try:
-        nutrition_data = _parse_nutrition(response.text)
+        response, used_provider = fallback_chain(fallback_steps)
+    except Exception as exc:
+        logger.exception("All AI providers failed for nutrition scan")
+        return _error(
+            "All AI providers failed to analyze the image. Please try again later.",
+            503,
+        )
 
+    # Normalise response text regardless of provider source
+    if used_provider.startswith("gemini"):
+        # Gemini response object
+        response_text = response.text
+    elif isinstance(response, dict) and response.get("choices"):
+        # Groq (OpenAI‑compatible) response dict
+        response_text = response["choices"][0]["message"]["content"]
+    else:
+        # OpenAI response object
+        response_text = response.choices[0].message.content
+
+    logger.info("Nutrition analysis succeeded using provider %s", used_provider)
+
+
+    # ---------------------------------------------------------------------
+    # The original Gemini‑only retry block (lines 358‑447) was redundant because
+    # the fallback chain above already obtained a successful response (if any).
+    # We now parse the normalized `response_text` from the fallback, save the
+    # scan, and return the result.
+    # ---------------------------------------------------------------------
+    # STEP 8: Parse nutrition response (already obtained from fallback)
+    try:
+        nutrition_data = _parse_nutrition(response_text)
     except Exception:
         logger.exception('Nutrition response parsing failed.')
         return _error(
-            'Gemini returned invalid nutrition data. Please scan again.',
-            502
+            'Provider returned invalid nutrition data. Please scan again.',
+            502,
         )
 
-    # STEP 9: Save food and image to database
+    # STEP 9: Save food and image to database (same as original logic)
     try:
         _save_food_scan(
             request.user,
             image,
-            nutrition_data
+            nutrition_data,
         )
-
     except Exception:
         logger.exception('Could not save food scan to database.')
         return _error(
             'Food was analyzed, but saving the result failed.',
-            500
+            500,
         )
 
     # STEP 10: Return successful response
     return JsonResponse({
         'success': True,
-        'nutrition': nutrition_data
+        'nutrition': nutrition_data,
     })
+
+
 
 
 

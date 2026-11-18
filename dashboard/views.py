@@ -13,7 +13,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie
 
-from workouts.models import Workout
+from workouts.models import Workout, BodyCompositionRecord
 from diet.models import WeeklyDietPlan, UserFitnessProfile
 from nutrition.models import FoodScan, NutritionGoal, WaterIntake
 from reminders.models import Reminder
@@ -85,32 +85,39 @@ def normalize_diet_meals(meals):
 
     for meal in meals:
 
-        # Convert string meal into dictionary
+        # Handle string meals
         if isinstance(meal, str):
 
-            meal = parse_stored_data(meal)
+            original_text = meal.strip()
 
-        # Keep valid meal dictionaries
-        if isinstance(meal, dict):
+            parsed_meal = parse_stored_data(meal)
+
+            # If string contains a valid dictionary
+            if isinstance(parsed_meal, dict) and parsed_meal:
+
+                cleaned_meals.append(parsed_meal)
+
+            # If it is ordinary text, preserve it
+            elif original_text:
+
+                cleaned_meals.append({
+
+                    "meal": "Meal",
+
+                    "food": original_text,
+
+                    "calories": 0,
+
+                    "protein": 0,
+
+                    "cost": 0
+
+                })
+
+        # Keep valid dictionaries
+        elif isinstance(meal, dict):
 
             cleaned_meals.append(meal)
-
-        # Handle plain text meal names
-        elif isinstance(meal, str) and meal.strip():
-
-            cleaned_meals.append({
-
-                "meal": "Meal",
-
-                "food": meal,
-
-                "calories": 0,
-
-                "protein": 0,
-
-                "cost": 0
-
-            })
 
     return cleaned_meals
 
@@ -164,6 +171,52 @@ def get_today_diet_meals(user, today):
     return normalize_diet_meals(meals)
 
 
+# ==============================================================
+# HELPER 5: GET LATEST BODY COMPOSITION
+# ==============================================================
+
+def get_latest_body_composition(user):
+
+    record = BodyCompositionRecord.objects.filter(
+        user=user
+    ).order_by('-measurement_date').first()
+
+    if not record:
+
+        return None
+
+    return {
+
+        "record": record,
+
+        "measurement_date": record.measurement_date,
+
+        "BMI": record.bmi,
+
+        "body_fat_percent": record.body_fat_percent,
+
+        "fat_mass_kg": record.fat_mass_kg,
+
+        "lean_body_mass_kg": record.lean_body_mass_kg,
+
+        "waist_to_height_ratio": record.waist_to_height_ratio,
+
+        "visceral_fat_risk": record.visceral_fat_risk,
+
+        "BMR": record.bmr,
+
+        "data_source": record.data_source,
+
+        "notes": record.notes,
+
+        "disclaimer": (
+            "These are formula-based estimates, not actual DEXA results. "
+            "Visceral fat risk is an indicator, not a direct measurement. "
+            "Lean body mass is not the same as skeletal muscle mass."
+        )
+
+    }
+
 
 # ==============================================================
 # DASHBOARD SUMMARY API
@@ -171,38 +224,73 @@ def get_today_diet_meals(user, today):
 
 @require_GET
 def dashboard_summary_api(request):
+
     if not request.user.is_authenticated:
+
         return JsonResponse({
+
             'success': False,
+
             'message': 'Authentication required.'
+
         }, status=401)
 
     user = request.user
+
     today, tomorrow, today_start, tomorrow_start = (
         get_today_datetime_range()
     )
 
-    # Daily progress steps & activity
+    # ==========================================================
+    # DAILY PROGRESS STEPS & ACTIVITY
+    # ==============================================================
+
     daily_progress = DailyProgress.objects.filter(
         user=user,
         date=today
     ).first()
 
     steps = daily_progress.steps if daily_progress else 0
-    steps_goal = daily_progress.steps_goal if daily_progress else 8000
-    active_minutes = daily_progress.active_minutes if daily_progress else 0
-    distance_km = round(daily_progress.distance_km, 2) if daily_progress else 0.0
-    activity_calories = round(daily_progress.activity_calories, 1) if daily_progress else 0.0
 
-    # User profile & weight
-    profile = UserFitnessProfile.objects.filter(user=user).first()
-    weight = (
-        daily_progress.weight_kg
-        if daily_progress and daily_progress.weight_kg is not None
-        else profile.weight_kg if profile else None
+    steps_goal = daily_progress.steps_goal if daily_progress else 8000
+
+    active_minutes = (
+        daily_progress.active_minutes
+        if daily_progress else 0
     )
 
-    # Today's consumed nutrition
+    distance_km = (
+        round(daily_progress.distance_km, 2)
+        if daily_progress else 0.0
+    )
+
+    activity_calories = (
+        round(daily_progress.activity_calories, 1)
+        if daily_progress else 0.0
+    )
+
+    # ==========================================================
+    # USER PROFILE & WEIGHT
+    # ==============================================================
+
+    profile = UserFitnessProfile.objects.filter(
+        user=user
+    ).first()
+
+    weight = (
+
+        daily_progress.weight_kg
+
+        if daily_progress and daily_progress.weight_kg is not None
+
+        else profile.weight_kg if profile else None
+
+    )
+
+    # ==========================================================
+    # TODAY'S CONSUMED NUTRITION
+    # ==============================================================
+
     food_data = FoodScan.objects.filter(
         user=user,
         is_consumed=True,
@@ -212,39 +300,125 @@ def dashboard_summary_api(request):
         total_protein=Sum('protein'),
         total_calories=Sum('calories')
     )
-    consumed_protein = round(float(food_data['total_protein'] or 0), 1)
-    consumed_calories = round(float(food_data['total_calories'] or 0), 1)
 
-    # Today's water intake
+    consumed_protein = round(
+        float(food_data['total_protein'] or 0),
+        1
+    )
+
+    consumed_calories = round(
+        float(food_data['total_calories'] or 0),
+        1
+    )
+
+    # ==========================================================
+    # TODAY'S WATER INTAKE
+    # ==============================================================
+
     water_record = WaterIntake.objects.filter(
         user=user,
         date=today
     ).first()
-    water_amount = round(float(water_record.water_amount), 1) if water_record else 0.0
-    water_target = round(float(water_record.target_amount), 1) if water_record else 3.0
 
-    # Today's diet meals from weekly plan
-    today_diet_meals = get_today_diet_meals(user, today)
+    water_amount = (
+        round(float(water_record.water_amount), 1)
+        if water_record else 0.0
+    )
+
+    water_target = (
+        round(float(water_record.target_amount), 1)
+        if water_record else 3.0
+    )
+
+    # ==========================================================
+    # TODAY'S DIET MEALS FROM WEEKLY PLAN
+    # ==============================================================
+
+    today_diet_meals = get_today_diet_meals(
+        user,
+        today
+    )
+
     planned_protein = round(
-        sum(float(meal.get('protein', 0) or 0) for meal in today_diet_meals),
+        sum(
+            float(meal.get('protein', 0) or 0)
+            for meal in today_diet_meals
+        ),
         1
     )
 
+    # ==========================================================
+    # LATEST BODY COMPOSITION
+    # ==============================================================
+
+    body_composition = get_latest_body_composition(
+        user
+    )
+
+    body_composition_data = None
+
+    if body_composition:
+
+        body_composition_data = {
+
+            "measurement_date": str(
+                body_composition["measurement_date"]
+            ),
+
+            "BMI": body_composition["BMI"],
+
+            "body_fat_percent": body_composition["body_fat_percent"],
+
+            "fat_mass_kg": body_composition["fat_mass_kg"],
+
+            "lean_body_mass_kg": body_composition["lean_body_mass_kg"],
+
+            "waist_to_height_ratio": body_composition["waist_to_height_ratio"],
+
+            "visceral_fat_risk": body_composition["visceral_fat_risk"],
+
+            "BMR": body_composition["BMR"],
+
+            "data_source": body_composition["data_source"],
+
+        }
+
+    # ==========================================================
+    # API RESPONSE
+    # ==============================================================
+
     return JsonResponse({
+
         'success': True,
+
         'steps': steps,
+
         'steps_goal': steps_goal,
+
         'active_minutes': active_minutes,
+
         'distance_km': distance_km,
+
         'activity_calories': activity_calories,
+
         'consumed_calories': consumed_calories,
+
         'consumed_protein': consumed_protein,
+
         'planned_protein': planned_protein,
+
         'water_amount': water_amount,
+
         'water_target': water_target,
+
         'weight_kg': weight,
+
         'day_name': today.strftime("%A"),
+
         'today_diet_meals': today_diet_meals,
+
+        'body_composition': body_composition_data,
+
     })
 
 
@@ -263,7 +437,7 @@ def dashboard(request):
 
     # ==========================================================
     # DASHBOARD SUMMARY
-    # ==========================================================
+    # ==============================================================
 
     dashboard_data = Dashboard.objects.filter(
         user=user
@@ -271,7 +445,7 @@ def dashboard(request):
 
     # ==========================================================
     # TODAY'S WORKOUT
-    # ==========================================================
+    # ==============================================================
 
     workout = Workout.objects.filter(
         user=user,
@@ -284,7 +458,7 @@ def dashboard(request):
 
     # ==========================================================
     # TODAY'S COMPLETED WORKOUTS
-    # ==========================================================
+    # ==============================================================
 
     today_completed_workouts = Workout.objects.filter(
         user=user,
@@ -484,6 +658,14 @@ def dashboard(request):
                 todays_reminders.append(reminder)
 
     # ==========================================================
+    # LATEST BODY COMPOSITION
+    # ==============================================================
+
+    body_composition = get_latest_body_composition(
+        user
+    )
+
+    # ==========================================================
     # DASHBOARD CONTEXT
     # ==============================================================
 
@@ -530,6 +712,14 @@ def dashboard(request):
         "activity_calories_today": activity_calories_today,
 
         "distance_today": distance_today,
+
+        # Body composition additions
+        "body_composition": body_composition,
+
+        "body_composition_record": (
+            body_composition["record"]
+            if body_composition else None
+        ),
 
     }
 
@@ -681,6 +871,51 @@ def get_user_fitness_context(user):
 
         context["fitness_profile"] = (
             "User has not completed fitness profile."
+        )
+
+    # ==========================================================
+    # BODY COMPOSITION ASSESSMENT
+    # ==============================================================
+
+    body_composition = get_latest_body_composition(
+        user
+    )
+
+    if body_composition:
+
+        context["body_composition"] = {
+
+            "measurement_date": str(
+                body_composition["measurement_date"]
+            ),
+
+            "BMI": body_composition["BMI"],
+
+            "body_fat_percent": body_composition["body_fat_percent"],
+
+            "fat_mass_kg": body_composition["fat_mass_kg"],
+
+            "lean_body_mass_kg": body_composition["lean_body_mass_kg"],
+
+            "waist_to_height_ratio": body_composition["waist_to_height_ratio"],
+
+            "visceral_fat_risk": body_composition["visceral_fat_risk"],
+
+            "BMR": body_composition["BMR"],
+
+            "data_source": body_composition["data_source"],
+
+            "notes": body_composition["notes"],
+
+            "disclaimer": body_composition["disclaimer"],
+
+        }
+
+    else:
+
+        context["body_composition"] = (
+            "No body composition assessment available yet. "
+            "The user can generate an assessment from the Workout page."
         )
 
     # ==========================================================
@@ -1120,13 +1355,17 @@ def chat_api(request):
 
             }, status=400)
 
+        # ======================================================
         # GET USER FITNESS DATA
+        # ======================================================
 
         user_context = get_user_fitness_context(
             request.user
         )
 
+        # ======================================================
         # RETRIEVE RELEVANT KNOWLEDGE
+        # ======================================================
 
         retrieved_knowledge = retrieve_fitness_knowledge(
             message
@@ -1143,7 +1382,9 @@ def chat_api(request):
                 "No directly matching fitness knowledge found."
             )
 
+        # ======================================================
         # AI SYSTEM PROMPT
+        # ======================================================
 
         system_prompt = f"""
         You are FitAI, a personalized AI fitness assistant.
@@ -1157,6 +1398,10 @@ def chat_api(request):
         5. Explain protein and calorie requirements.
         6. Give fitness progress suggestions.
         7. Help users achieve their fitness goals.
+        8. Explain the user's body composition assessment.
+        9. Help the user understand estimated body fat,
+           fat mass, lean body mass, waist-to-height ratio,
+           visceral fat risk and BMR.
 
         IMPORTANT INSTRUCTIONS:
 
@@ -1164,6 +1409,7 @@ def chat_api(request):
         - Consider weight, height, BMI, age and fitness goal.
         - Consider previous workouts.
         - Consider available diet information.
+        - Use body composition information when available.
         - Do not invent missing information.
         - Give beginner-friendly explanations.
         - Recommend realistic workouts.
@@ -1171,6 +1417,16 @@ def chat_api(request):
         - Never recommend extreme dieting.
         - Do not diagnose medical conditions.
         - Ask questions if important information is missing.
+
+        BODY COMPOSITION SAFETY:
+
+        - Body composition values may be formula-based estimates.
+        - Do not describe formula estimates as actual DEXA results.
+        - Visceral fat risk is an indicator, not a direct measurement.
+        - Lean body mass is not the same as skeletal muscle mass.
+        - Do not invent skeletal muscle mass.
+        - Explain that estimates can have measurement error.
+        - Avoid making medical diagnoses from these values.
 
         USER FITNESS INFORMATION:
 
@@ -1183,7 +1439,9 @@ def chat_api(request):
         Always provide clear, structured and helpful answers.
         """
 
+        # ======================================================
         # GET CHAT HISTORY
+        # ======================================================
 
         history = request.session.get(
             "fitai_chat_history",
@@ -1214,7 +1472,9 @@ def chat_api(request):
 
                 })
 
+        # ======================================================
         # ADD CURRENT MESSAGE
+        # ======================================================
 
         chat_messages.append({
 
@@ -1224,7 +1484,9 @@ def chat_api(request):
 
         })
 
+        # ======================================================
         # CONNECT TO OLLAMA
+        # ==============================================================
 
         ollama_response = requests.post(
 
@@ -1250,7 +1512,9 @@ def chat_api(request):
 
         ai_reply = result["message"]["content"]
 
+        # ======================================================
         # SAVE CHAT HISTORY
+        # ==============================================================
 
         history.append({
 

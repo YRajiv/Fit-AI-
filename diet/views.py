@@ -1,9 +1,9 @@
-
 import json
 import os
 import re
 import time
 import datetime
+import traceback
 
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -16,17 +16,39 @@ from google.genai import types
 
 from .models import UserFitnessProfile, WeeklyDietPlan
 
+# AI fallback functions
+from nutrition.ai_fallback import call_groq, call_openai
+
 
 # ============================================================
 # GEMINI CLIENT
 # ============================================================
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = (
+    getattr(__import__("django.conf").conf.settings, "GEMINI_API_KEY", None)
+    or os.getenv("GEMINI_API_KEY")
+)
+
+GEMINI_MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-3.5-flash"
+)
 
 client = None
 
 if GEMINI_API_KEY:
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    try:
+        client = genai.Client(
+            api_key=GEMINI_API_KEY
+        )
+
+        print("FITAI DIET: Gemini client initialized.")
+
+    except Exception as e:
+
+        print("FITAI DIET: Gemini initialization failed:", e)
+
+        client = None
 
 
 # ============================================================
@@ -39,7 +61,9 @@ def calculate_bmi(profile):
     weight = float(profile.weight_kg)
 
     if height <= 0 or weight <= 0:
-        raise ValueError("Height and weight must be greater than zero.")
+        raise ValueError(
+            "Height and weight must be greater than zero."
+        )
 
     height_m = height / 100
 
@@ -66,8 +90,8 @@ def calculate_bmi(profile):
 
 
 # ============================================================
-# FALLBACK DIET PLAN
-# Used when Gemini is unavailable
+# STATIC FALLBACK DIET PLAN
+# Used when all AI providers fail
 # ============================================================
 
 def create_fallback_diet_plan():
@@ -81,10 +105,6 @@ def create_fallback_diet_plan():
         "Saturday",
         "Sunday"
     ]
-
-    # Each meal:
-    # Meal name, food, calories, protein, carbs,
-    # fat, fiber, sugar, cost
 
     breakfast_options = [
         ("Idli with sambar", 300, 10, 50, 5, 6, 3, 25),
@@ -165,29 +185,16 @@ def create_fallback_diet_plan():
             meal_data = all_options[meal_index][day_index]
 
             meal = {
-
                 "meal": meal_names[meal_index],
-
                 "food": meal_data[0],
-
-                "ingredients": [
-                    meal_data[0]
-                ],
-
+                "ingredients": [meal_data[0]],
                 "calories": meal_data[1],
-
                 "protein": meal_data[2],
-
                 "carbs": meal_data[3],
-
                 "fat": meal_data[4],
-
                 "fiber": meal_data[5],
-
                 "sugar": meal_data[6],
-
                 "cost": meal_data[7]
-
             }
 
             fallback_plan[day_name].append(meal)
@@ -202,7 +209,9 @@ def create_fallback_diet_plan():
 def clean_json_response(response_text):
 
     if not response_text:
-        raise ValueError("Gemini returned an empty response.")
+        raise ValueError(
+            "AI returned an empty response."
+        )
 
     response_text = response_text.strip()
 
@@ -219,19 +228,10 @@ def clean_json_response(response_text):
 
 
 # ============================================================
-# GEMINI DIET GENERATOR WITH AUTOMATIC RETRIES
+# DIET PROMPT
 # ============================================================
 
-def generate_ai_diet_plan(profile, bmi_data):
-
-    # If API key or client is unavailable,
-    # immediately use the fallback plan.
-
-    if client is None:
-
-        print("Gemini API key missing. Using fallback diet plan.")
-
-        return create_fallback_diet_plan()
+def create_diet_prompt(profile, bmi_data):
 
     height = float(profile.height_cm)
     weight = float(profile.weight_kg)
@@ -254,8 +254,6 @@ BMI Category: {bmi_category}
 
 DIET INSTRUCTIONS
 -----------------
-
-Use the user's BMI category to guide general food recommendations.
 
 If Underweight:
 - Suggest balanced meals with adequate energy.
@@ -374,7 +372,10 @@ Do not return explanations.
 Return JSON only.
 """
 
-    system_instruction = """
+    return prompt
+
+
+SYSTEM_INSTRUCTION = """
 You are FitAI's Indian diet planning engine.
 
 Generate realistic and balanced Indian meals.
@@ -387,91 +388,317 @@ or protein requirements.
 Return valid JSON only.
 """
 
-    # Try Gemini up to three times.
 
-    for attempt in range(3):
+# ============================================================
+# OPENAI-COMPATIBLE MESSAGE CREATION
+# ============================================================
 
-        try:
+def create_ai_messages(profile, bmi_data):
 
-            print(
-                f"Gemini diet generation attempt {attempt + 1}/3"
-            )
+    prompt = create_diet_prompt(
+        profile,
+        bmi_data
+    )
 
-            response = client.models.generate_content(
+    return [
+        {
+            "role": "system",
+            "content": SYSTEM_INSTRUCTION
+        },
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ]
 
-                model="gemini-3.8-flash",
 
-                contents=prompt,
+# ============================================================
+# GEMINI GENERATION
+# ============================================================
 
-                config=types.GenerateContentConfig(
+def generate_with_gemini(prompt):
 
-                    system_instruction=system_instruction,
+    if client is None:
 
-                    temperature=0.7,
+        raise RuntimeError(
+            "Gemini client is unavailable."
+        )
 
-                    response_mime_type="application/json"
+    response = client.models.generate_content(
 
-                )
+        model=GEMINI_MODEL,
 
-            )
+        contents=prompt,
 
-            response_text = clean_json_response(
-                response.text
-            )
+        config=types.GenerateContentConfig(
 
-            ai_plan = json.loads(response_text)
+            system_instruction=SYSTEM_INSTRUCTION,
 
-            validate_diet_plan(ai_plan)
+            temperature=0.7,
 
-            print("Gemini diet plan generated successfully.")
+            response_mime_type="application/json",
 
-            return ai_plan
+            max_output_tokens=8192
 
-        except Exception as e:
+        )
 
-            error_message = str(e)
+    )
 
-            print(
-                "GEMINI ERROR:",
-                error_message
-            )
+    if not response.text:
 
-            # Temporary server or quota errors.
-            temporary_error = any(
-                error in error_message.upper()
-                for error in [
-                    "503",
-                    "UNAVAILABLE",
-                    "429",
-                    "RESOURCE_EXHAUSTED",
-                    "500",
-                    "502",
-                    "504",
-                    "INTERNAL"
-                ]
-            )
+        raise ValueError(
+            "Gemini returned an empty response."
+        )
 
-            if temporary_error and attempt < 2:
+    return json.loads(
+        clean_json_response(response.text)
+    )
 
-                wait_time = 2 ** (attempt + 1)
+
+# ============================================================
+# GROQ GENERATION
+# ============================================================
+
+def generate_with_groq(messages):
+
+    print("FITAI DIET: Trying Groq...")
+
+    response = call_groq(
+        messages=messages,
+        timeout=45
+    )
+
+    content = (
+        response.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+    )
+
+    if not content:
+
+        raise ValueError(
+            "Groq returned an empty response."
+        )
+
+    return json.loads(
+        clean_json_response(content)
+    )
+
+
+# ============================================================
+# OPENAI GENERATION
+# ============================================================
+
+def generate_with_openai(messages):
+
+    print("FITAI DIET: Trying OpenAI...")
+
+    response = call_openai(
+        messages=messages,
+        timeout=45
+    )
+
+    content = response.choices[0].message.content
+
+    if not content:
+
+        raise ValueError(
+            "OpenAI returned an empty response."
+        )
+
+    return json.loads(
+        clean_json_response(content)
+    )
+
+
+# ============================================================
+# AI DIET GENERATOR WITH AUTOMATIC FALLBACK
+#
+# Order:
+# 1. Gemini (3 attempts)
+# 2. Groq
+# 3. OpenAI
+# 4. Static fallback
+# ============================================================
+
+def generate_ai_diet_plan(profile, bmi_data):
+
+    prompt = create_diet_prompt(
+        profile,
+        bmi_data
+    )
+
+    messages = create_ai_messages(
+        profile,
+        bmi_data
+    )
+
+    # --------------------------------------------------------
+    # PROVIDER 1: GEMINI
+    # --------------------------------------------------------
+
+    if client is not None:
+
+        for attempt in range(3):
+
+            try:
 
                 print(
-                    f"Retrying Gemini in {wait_time} seconds..."
+                    f"FITAI DIET: Gemini attempt "
+                    f"{attempt + 1}/3"
                 )
 
-                time.sleep(wait_time)
+                ai_plan = generate_with_gemini(
+                    prompt
+                )
 
-                continue
+                validate_diet_plan(
+                    ai_plan
+                )
 
-            # If Gemini fails, use fallback.
-            print(
-                "Gemini failed. Switching to fallback diet plan."
-            )
+                print(
+                    "FITAI DIET: Gemini succeeded."
+                )
 
-            return create_fallback_diet_plan()
+                return ai_plan
 
-    # Final safety fallback.
-    return create_fallback_diet_plan()
+            except Exception as e:
+
+                print(
+                    f"GEMINI DIET ERROR: {e}"
+                )
+
+                traceback.print_exc()
+
+                error_message = str(e).upper()
+
+                temporary_error = any(
+                    error in error_message
+                    for error in [
+                        "503",
+                        "UNAVAILABLE",
+                        "429",
+                        "RESOURCE_EXHAUSTED",
+                        "500",
+                        "502",
+                        "504",
+                        "INTERNAL",
+                        "TIMEOUT"
+                    ]
+                )
+
+                if temporary_error and attempt < 2:
+
+                    wait_time = 2 ** (attempt + 1)
+
+                    print(
+                        f"Gemini retrying after "
+                        f"{wait_time} seconds..."
+                    )
+
+                    time.sleep(
+                        wait_time
+                    )
+
+                else:
+
+                    print(
+                        "FITAI DIET: Gemini failed. "
+                        "Moving to Groq."
+                    )
+
+                    break
+
+    else:
+
+        print(
+            "FITAI DIET: Gemini is not configured."
+        )
+
+
+    # --------------------------------------------------------
+    # PROVIDER 2: GROQ
+    # --------------------------------------------------------
+
+    try:
+
+        ai_plan = generate_with_groq(
+            messages
+        )
+
+        validate_diet_plan(
+            ai_plan
+        )
+
+        print(
+            "FITAI DIET: Groq succeeded."
+        )
+
+        return ai_plan
+
+    except Exception as e:
+
+        print(
+            f"GROQ DIET ERROR: {e}"
+        )
+
+        traceback.print_exc()
+
+        print(
+            "FITAI DIET: Groq failed. "
+            "Moving to OpenAI."
+        )
+
+
+    # --------------------------------------------------------
+    # PROVIDER 3: OPENAI
+    # --------------------------------------------------------
+
+    try:
+
+        ai_plan = generate_with_openai(
+            messages
+        )
+
+        validate_diet_plan(
+            ai_plan
+        )
+
+        print(
+            "FITAI DIET: OpenAI succeeded."
+        )
+
+        return ai_plan
+
+    except Exception as e:
+
+        print(
+            f"OPENAI DIET ERROR: {e}"
+        )
+
+        traceback.print_exc()
+
+        print(
+            "FITAI DIET: All AI providers failed. "
+            "Using static diet plan."
+        )
+
+
+    # --------------------------------------------------------
+    # PROVIDER 4: STATIC FALLBACK
+    # --------------------------------------------------------
+
+    fallback_plan = create_fallback_diet_plan()
+
+    validate_diet_plan(
+        fallback_plan
+    )
+
+    print(
+        "FITAI DIET: Static fallback plan generated."
+    )
+
+    return fallback_plan
 
 
 # ============================================================
@@ -509,23 +736,29 @@ def validate_diet_plan(plan):
     ]
 
     if not isinstance(plan, dict):
-        raise ValueError("Diet plan must be a JSON object.")
+
+        raise ValueError(
+            "Diet plan must be a JSON object."
+        )
 
     for day in days:
 
         if day not in plan:
+
             raise ValueError(
-                f"{day} is missing from the diet plan."
+                f"{day} is missing."
             )
 
         meals = plan[day]
 
         if not isinstance(meals, list):
+
             raise ValueError(
-                f"{day} must contain a list of meals."
+                f"{day} must contain a list."
             )
 
         if len(meals) != 5:
+
             raise ValueError(
                 f"{day} must contain exactly five meals."
             )
@@ -533,16 +766,19 @@ def validate_diet_plan(plan):
         for index, meal in enumerate(meals):
 
             if not isinstance(meal, dict):
+
                 raise ValueError(
                     f"Invalid meal in {day}."
                 )
 
             if meal.get("meal") != required_meal_types[index]:
+
                 raise ValueError(
                     f"Incorrect meal order in {day}."
                 )
 
-            if "food" not in meal:
+            if not meal.get("food"):
+
                 raise ValueError(
                     f"Food information missing in {day}."
                 )
@@ -550,21 +786,25 @@ def validate_diet_plan(plan):
             for field in required_fields:
 
                 if field not in meal:
+
                     raise ValueError(
-                        f"{field} information missing in {day}."
+                        f"{field} missing in {day}."
                     )
 
                 try:
 
-                    value = float(meal[field])
+                    value = float(
+                        meal[field]
+                    )
 
                     if value < 0:
+
                         raise ValueError()
 
                 except (ValueError, TypeError):
 
                     raise ValueError(
-                        f"Invalid {field} value in {day}."
+                        f"Invalid {field} in {day}."
                     )
 
     return plan
@@ -610,7 +850,10 @@ def calculate_daily_total(meals):
             meal.get("sugar", 0)
         )
 
-        cost = meal.get("cost", 0)
+        cost = meal.get(
+            "cost",
+            0
+        )
 
         if isinstance(cost, str):
 
@@ -622,7 +865,9 @@ def calculate_daily_total(meals):
 
         try:
 
-            total_cost += float(cost)
+            total_cost += float(
+                cost
+            )
 
         except (ValueError, TypeError):
 
@@ -630,19 +875,39 @@ def calculate_daily_total(meals):
 
     return {
 
-        "calories": round(total_calories),
+        "calories": round(
+            total_calories
+        ),
 
-        "protein": round(total_protein, 1),
+        "protein": round(
+            total_protein,
+            1
+        ),
 
-        "carbs": round(total_carbs, 1),
+        "carbs": round(
+            total_carbs,
+            1
+        ),
 
-        "fat": round(total_fat, 1),
+        "fat": round(
+            total_fat,
+            1
+        ),
 
-        "fiber": round(total_fiber, 1),
+        "fiber": round(
+            total_fiber,
+            1
+        ),
 
-        "sugar": round(total_sugar, 1),
+        "sugar": round(
+            total_sugar,
+            1
+        ),
 
-        "cost": round(total_cost, 2)
+        "cost": round(
+            total_cost,
+            2
+        )
 
     }
 
@@ -667,7 +932,10 @@ def prepare_plan_for_template(plan):
 
     for day in days:
 
-        meals = plan.get(day, [])
+        meals = plan.get(
+            day,
+            []
+        )
 
         # Support older saved plan format.
         if isinstance(meals, dict):
@@ -677,7 +945,9 @@ def prepare_plan_for_template(plan):
                 []
             )
 
-        total = calculate_daily_total(meals)
+        total = calculate_daily_total(
+            meals
+        )
 
         final_plan[day] = {
 
@@ -719,7 +989,9 @@ def dashboard_view(request):
 
     except UserFitnessProfile.DoesNotExist:
 
-        return redirect("onboarding")
+        return redirect(
+            "onboarding"
+        )
 
     plan_obj = WeeklyDietPlan.objects.filter(
         user=request.user
@@ -727,7 +999,9 @@ def dashboard_view(request):
 
     today_diet_meals = []
 
-    current_day_name = datetime.datetime.now().strftime("%A")
+    current_day_name = datetime.datetime.now().strftime(
+        "%A"
+    )
 
     if plan_obj and plan_obj.plan_json:
 
@@ -797,33 +1071,42 @@ def save_profile_api(request):
 
     try:
 
-        data = json.loads(request.body)
+        data = json.loads(
+            request.body
+        )
 
-        height = float(data.get("height"))
+        height = float(
+            data.get("height")
+        )
 
-        weight = float(data.get("weight"))
+        weight = float(
+            data.get("weight")
+        )
 
         if height <= 0:
+
             raise ValueError(
                 "Height must be greater than zero."
             )
 
         if weight <= 0:
+
             raise ValueError(
                 "Weight must be greater than zero."
             )
 
         if height < 50 or height > 250:
+
             raise ValueError(
                 "Please enter a valid height in cm."
             )
 
         if weight < 10 or weight > 300:
+
             raise ValueError(
                 "Please enter a valid weight in kg."
             )
 
-        # Save only height and weight.
         profile, created = UserFitnessProfile.objects.update_or_create(
 
             user=request.user,
@@ -838,9 +1121,13 @@ def save_profile_api(request):
 
         )
 
-        bmi_data = calculate_bmi(profile)
+        bmi_data = calculate_bmi(
+            profile
+        )
 
-        # Remove the previous plan because the BMI may have changed.
+        # Remove the previous diet plan
+        # because profile details changed.
+
         WeeklyDietPlan.objects.filter(
             user=request.user
         ).delete()
@@ -888,10 +1175,14 @@ def diet_dashboard_view(request):
 
     except UserFitnessProfile.DoesNotExist:
 
-        return redirect("onboarding")
+        return redirect(
+            "onboarding"
+        )
 
     # Calculate BMI.
-    bmi_data = calculate_bmi(profile)
+    bmi_data = calculate_bmi(
+        profile
+    )
 
     bmi = bmi_data["bmi"]
 
@@ -918,7 +1209,9 @@ def diet_dashboard_view(request):
                 bmi_data
             )
 
-            validate_diet_plan(ai_plan)
+            validate_diet_plan(
+                ai_plan
+            )
 
             plan_data = prepare_plan_for_template(
                 ai_plan
@@ -939,6 +1232,8 @@ def diet_dashboard_view(request):
                 "DIET GENERATION ERROR:",
                 str(e)
             )
+
+            traceback.print_exc()
 
             return render(
 
@@ -1020,17 +1315,21 @@ def diet_dashboard_view(request):
     )
 
 
-
 # ============================================================
 # DIET PLAN API
 # ============================================================
 
 @require_GET
 def diet_plan_api(request):
+
     if not request.user.is_authenticated:
+
         return JsonResponse({
-            'success': False,
-            'message': 'Authentication required.'
+
+            "success": False,
+
+            "message": "Authentication required."
+
         }, status=401)
 
     profile = UserFitnessProfile.objects.filter(
@@ -1038,19 +1337,33 @@ def diet_plan_api(request):
     ).first()
 
     if profile is None:
+
         return JsonResponse({
-            'success': True,
-            'has_profile': False,
-            'profile': None,
-            'weekly_plan': None,
+
+            "success": True,
+
+            "has_profile": False,
+
+            "profile": None,
+
+            "weekly_plan": None,
+
         })
 
     try:
-        bmi_data = calculate_bmi(profile)
+
+        bmi_data = calculate_bmi(
+            profile
+        )
+
     except Exception as e:
+
         return JsonResponse({
-            'success': False,
-            'error': str(e)
+
+            "success": False,
+
+            "error": str(e)
+
         }, status=400)
 
     plan_obj = WeeklyDietPlan.objects.filter(
@@ -1060,42 +1373,100 @@ def diet_plan_api(request):
     plan_data = {}
 
     if not plan_obj:
+
         try:
-            ai_plan = generate_ai_diet_plan(profile, bmi_data)
-            validate_diet_plan(ai_plan)
-            plan_data = prepare_plan_for_template(ai_plan)
-            plan_obj = WeeklyDietPlan.objects.create(
-                user=request.user,
-                plan_json=plan_data
+
+            ai_plan = generate_ai_diet_plan(
+                profile,
+                bmi_data
             )
-        except Exception:
+
+            validate_diet_plan(
+                ai_plan
+            )
+
+            plan_data = prepare_plan_for_template(
+                ai_plan
+            )
+
+            plan_obj = WeeklyDietPlan.objects.create(
+
+                user=request.user,
+
+                plan_json=plan_data
+
+            )
+
+        except Exception as e:
+
+            print(
+                "DIET API ERROR:",
+                str(e)
+            )
+
+            traceback.print_exc()
+
             ai_plan = create_fallback_diet_plan()
-            plan_data = prepare_plan_for_template(ai_plan)
-            plan_obj = WeeklyDietPlan.objects.create(
-                user=request.user,
-                plan_json=plan_data
+
+            plan_data = prepare_plan_for_template(
+                ai_plan
             )
+
+            plan_obj = WeeklyDietPlan.objects.create(
+
+                user=request.user,
+
+                plan_json=plan_data
+
+            )
+
     else:
+
         existing_plan = plan_obj.plan_json
+
         if existing_plan:
-            first_day = existing_plan.get("Monday", [])
+
+            first_day = existing_plan.get(
+                "Monday",
+                []
+            )
+
             if isinstance(first_day, list):
-                plan_data = prepare_plan_for_template(existing_plan)
+
+                plan_data = prepare_plan_for_template(
+                    existing_plan
+                )
+
                 plan_obj.plan_json = plan_data
-                plan_obj.save(update_fields=["plan_json"])
+
+                plan_obj.save(
+                    update_fields=["plan_json"]
+                )
+
             else:
+
                 plan_data = existing_plan
 
     return JsonResponse({
-        'success': True,
-        'has_profile': True,
-        'profile': {
-            'height_cm': profile.height_cm,
-            'weight_kg': profile.weight_kg,
-            'bmi': bmi_data['bmi'],
-            'bmi_category': bmi_data['bmi_category'],
+
+        "success": True,
+
+        "has_profile": True,
+
+        "profile": {
+
+            "height_cm": profile.height_cm,
+
+            "weight_kg": profile.weight_kg,
+
+            "bmi": bmi_data["bmi"],
+
+            "bmi_category": bmi_data["bmi_category"],
+
         },
-        'weekly_plan': plan_data,
+
+        "weekly_plan": plan_data,
+
     })
 
 

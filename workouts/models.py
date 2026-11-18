@@ -93,3 +93,47 @@ class Workout(models.Model):
 
     def __str__(self):
         return self.workout_name
+
+
+# -------------------------------------------------------
+# Body Composition History Model
+# -------------------------------------------------------
+class BodyCompositionRecord(models.Model):
+    """Stores a snapshot of a user's body measurements and derived metrics.
+    Used for tracking progress over time and providing inputs to the
+    personalized workout recommendation engine.
+    """
+
+    DATA_SOURCE_CHOICES = [
+        ("manual", "Manual Measurement"),
+        ("formula", "Formula Estimate"),
+        ("dexa", "DEXA Report (upload)"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="body_compositions")
+    measurement_date = models.DateField(default=timezone.now)
+
+    # Raw inputs – optional where appropriate
+    height_cm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    waist_cm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    neck_cm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    hip_cm = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # needed for female formula
+    sex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')], null=True, blank=True)
+    age = models.PositiveIntegerField(null=True, blank=True)
+
+    # Derived fields – stored for quick retrieval & historical charting
+    bmi = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    body_fat_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    fat_mass_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    lean_body_mass_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    skeletal_muscle_mass_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    waist_to_height_ratio = models.DecimalField(max_digits=5, decimal_places=3, null=True, blank=True)
+    visceral_fat_risk = models.CharField(max_length=50, null=True, blank=True)
+    bmr = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    data_source = models.CharField(max_length=10, choices=DATA_SOURCE_CHOICES, default="manual")
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.measurement_date}"

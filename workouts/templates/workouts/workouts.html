@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,6 +72,19 @@
             line-height: 1.6;
         }
 
+        .section-heading {
+            margin-top: 30px;
+            margin-bottom: 8px;
+            color: var(--purple-light);
+        }
+
+        .section-description {
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -109,6 +121,12 @@
 
         .form-group option {
             background: #211b36;
+        }
+
+        .form-group small {
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.5;
         }
 
         .form-actions {
@@ -187,6 +205,127 @@
         .info-item strong {
             font-size: 16px;
         }
+
+        /* BODY COMPOSITION */
+
+        .body-composition-section {
+            margin-top: 35px;
+            padding-top: 25px;
+            border-top: 1px solid var(--border);
+        }
+
+        .body-composition-section h2 {
+            color: var(--purple-light);
+        }
+
+        .body-composition-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .body-metric {
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            background: rgba(139, 92, 246, 0.10);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+        }
+
+        .body-metric::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--purple);
+        }
+
+        .body-metric-label {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .body-metric-value {
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 7px;
+            overflow-wrap: anywhere;
+        }
+
+        .body-metric-unit {
+            color: var(--purple-light);
+            font-size: 13px;
+        }
+
+        .body-metric-note {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+
+        .metric-bmi::before {
+            background: #38bdf8;
+        }
+
+        .metric-fat::before {
+            background: #f97316;
+        }
+
+        .metric-lean::before {
+            background: #22c55e;
+        }
+
+        .metric-risk::before {
+            background: #eab308;
+        }
+
+        .metric-bmr::before {
+            background: #ec4899;
+        }
+
+        .metric-waist::before {
+            background: #a78bfa;
+        }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 7px 12px;
+            border-radius: 20px;
+            background: rgba(234, 179, 8, 0.12);
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            color: #fde047;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .composition-disclaimer {
+            margin-top: 20px;
+            padding: 14px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 10px;
+            color: #bfdbfe;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .composition-empty {
+            margin-top: 20px;
+            padding: 18px;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* EXERCISES */
 
         .exercise-grid {
             display: grid;
@@ -300,6 +439,16 @@
             cursor: not-allowed;
         }
 
+        @media (max-width: 900px) {
+            .body-composition-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .workout-info {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         @media (max-width: 700px) {
             body {
                 padding: 18px;
@@ -310,12 +459,20 @@
                 grid-template-columns: 1fr;
             }
 
+            .body-composition-grid {
+                grid-template-columns: 1fr;
+            }
+
             .workout-info {
                 grid-template-columns: repeat(2, 1fr);
             }
 
             .card {
                 padding: 20px;
+            }
+
+            .page-header h1 {
+                font-size: 26px;
             }
         }
 
@@ -338,7 +495,7 @@
         </p>
     </div>
 
-    <!-- STEP 1: FITNESS ASSESSMENT FORM -->
+    <!-- STEP 1: FITNESS AND BODY COMPOSITION ASSESSMENT -->
 
     {% if not form_submitted %}
 
@@ -362,6 +519,14 @@
         <form method="POST" action="{% url 'workout:workouts' %}">
 
             {% csrf_token %}
+
+            <!-- BASIC FITNESS DETAILS -->
+
+            <h3 class="section-heading">Fitness Details</h3>
+
+            <p class="section-description">
+                These details help FitAI choose exercises suitable for your fitness level.
+            </p>
 
             <div class="form-grid">
 
@@ -419,6 +584,118 @@
                         required
                     >
                 </div>
+
+                <div class="form-group">
+                    <label for="age">Age (years)</label>
+
+                    <input
+                        type="number"
+                        name="age"
+                        id="age"
+                        placeholder="Enter your age"
+                        min="13"
+                        max="120"
+                        value="{{ selected_age|default:'' }}"
+                    >
+
+                    <small>Used for estimated metabolism calculations.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="sex">Sex used for body-fat formula</label>
+
+                    <select name="sex" id="sex">
+                        <option value="">Select</option>
+
+                        <option value="M"
+                            {% if selected_sex == "M" %}selected{% endif %}>
+                            Male
+                        </option>
+
+                        <option value="F"
+                            {% if selected_sex == "F" %}selected{% endif %}>
+                            Female
+                        </option>
+                    </select>
+
+                    <small>Used by the body-fat estimation formula.</small>
+                </div>
+
+            </div>
+
+            <!-- BODY MEASUREMENTS -->
+
+            <h3 class="section-heading">Body Measurements</h3>
+
+            <p class="section-description">
+                Enter measurements in centimeters. These are used to estimate body composition.
+                You can leave them empty if you do not know them.
+            </p>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="waist_cm">Waist (cm)</label>
+
+                    <input
+                        type="number"
+                        name="waist_cm"
+                        id="waist_cm"
+                        placeholder="Measure around your waist"
+                        min="20"
+                        max="250"
+                        step="0.1"
+                        value="{{ selected_waist|default:'' }}"
+                    >
+
+                    <small>Measure around your abdomen, normally near the navel.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="neck_cm">Neck (cm)</label>
+
+                    <input
+                        type="number"
+                        name="neck_cm"
+                        id="neck_cm"
+                        placeholder="Measure your neck"
+                        min="20"
+                        max="100"
+                        step="0.1"
+                        value="{{ selected_neck|default:'' }}"
+                    >
+
+                    <small>Measure around your neck without pulling the tape tight.</small>
+                </div>
+
+                <div class="form-group" id="hipGroup">
+                    <label for="hip_cm">Hip (cm)</label>
+
+                    <input
+                        type="number"
+                        name="hip_cm"
+                        id="hip_cm"
+                        placeholder="Measure your hips"
+                        min="30"
+                        max="250"
+                        step="0.1"
+                        value="{{ selected_hip|default:'' }}"
+                    >
+
+                    <small>Required by the formula for female body-fat estimation.</small>
+                </div>
+
+            </div>
+
+            <!-- EQUIPMENT DETAILS -->
+
+            <h3 class="section-heading">Available Equipment</h3>
+
+            <p class="section-description">
+                FitAI will recommend exercises based on the equipment you have.
+            </p>
+
+            <div class="form-grid">
 
                 <div class="form-group">
                     <label for="has_equipment">
@@ -479,7 +756,7 @@
     {% endif %}
 
 
-    <!-- STEP 2: RECOMMENDED WORKOUTS -->
+    <!-- STEP 2: RECOMMENDED WORKOUTS AND BODY COMPOSITION -->
 
     {% if form_submitted and workout_plan and recommended_exercises %}
 
@@ -517,7 +794,228 @@
 
         </div>
 
+        <!-- BODY COMPOSITION RESULTS -->
+
+        <div class="body-composition-section">
+
+            <h2>Body Composition Analysis</h2>
+
+            <p class="section-description">
+                Your estimated body composition calculated from your measurements.
+            </p>
+
+            {% if body_composition_results %}
+
+            <div class="body-composition-grid">
+
+                <!-- BMI -->
+
+                <div class="body-metric metric-bmi">
+
+                    <div class="body-metric-label">
+                        Body Mass Index (BMI)
+                    </div>
+
+                    <div class="body-metric-value">
+                        {{ body_composition_results.bmi|default:"N/A" }}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        kg/m²
+                    </div>
+
+                    <div class="body-metric-note">
+                        Calculated using your height and weight.
+                    </div>
+
+                </div>
+
+                <!-- BODY FAT PERCENTAGE -->
+
+                <div class="body-metric metric-fat">
+
+                    <div class="body-metric-label">
+                        Estimated Body Fat
+                    </div>
+
+                    <div class="body-metric-value">
+                        {% if body_composition_results.body_fat_percent != None %}
+                            {{ body_composition_results.body_fat_percent }}%
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        Percentage of your body weight
+                    </div>
+
+                    <div class="body-metric-note">
+                        Estimated using the circumference-based formula.
+                    </div>
+
+                </div>
+
+                <!-- FAT MASS -->
+
+                <div class="body-metric metric-fat">
+
+                    <div class="body-metric-label">
+                        Fat Mass
+                    </div>
+
+                    <div class="body-metric-value">
+                        {% if body_composition_results.fat_mass_kg != None %}
+                            {{ body_composition_results.fat_mass_kg }} kg
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        Estimated fat weight
+                    </div>
+
+                    <div class="body-metric-note">
+                        Calculated from estimated body-fat percentage.
+                    </div>
+
+                </div>
+
+                <!-- LEAN BODY MASS -->
+
+                <div class="body-metric metric-lean">
+
+                    <div class="body-metric-label">
+                        Lean Body Mass
+                    </div>
+
+                    <div class="body-metric-value">
+                        {% if body_composition_results.lean_body_mass_kg != None %}
+                            {{ body_composition_results.lean_body_mass_kg }} kg
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        Non-fat body mass estimate
+                    </div>
+
+                    <div class="body-metric-note">
+                        Includes muscle, bones, organs and body water.
+                        It is not the same as skeletal muscle mass.
+                    </div>
+
+                </div>
+
+                <!-- WAIST HEIGHT RATIO -->
+
+                <div class="body-metric metric-waist">
+
+                    <div class="body-metric-label">
+                        Waist-to-Height Ratio
+                    </div>
+
+                    <div class="body-metric-value">
+                        {% if body_composition_results.waist_to_height_ratio != None %}
+                            {{ body_composition_results.waist_to_height_ratio }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        Waist ÷ height
+                    </div>
+
+                    <div class="body-metric-note">
+                        A measurement used to understand abdominal fat distribution.
+                    </div>
+
+                </div>
+
+                <!-- VISCERAL FAT RISK -->
+
+                <div class="body-metric metric-risk">
+
+                    <div class="body-metric-label">
+                        Abdominal Fat Risk Indicator
+                    </div>
+
+                    <div class="body-metric-value" style="font-size:19px;">
+
+                        {% if body_composition_results.visceral_fat_risk %}
+                            <span class="risk-badge">
+                                {{ body_composition_results.visceral_fat_risk }}
+                            </span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+
+                    </div>
+
+                    <div class="body-metric-unit">
+                        Waist-to-height based indicator
+                    </div>
+
+                    <div class="body-metric-note">
+                        This is a risk indicator, not a direct measurement of visceral fat.
+                    </div>
+
+                </div>
+
+                <!-- BMR -->
+
+                <div class="body-metric metric-bmr">
+
+                    <div class="body-metric-label">
+                        Estimated BMR
+                    </div>
+
+                    <div class="body-metric-value">
+                        {% if body_composition_results.bmr != None %}
+                            {{ body_composition_results.bmr }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+
+                    <div class="body-metric-unit">
+                        kcal/day
+                    </div>
+
+                    <div class="body-metric-note">
+                        Estimated calories your body uses at rest per day.
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="composition-disclaimer">
+                <strong>Important:</strong> These are mathematical estimates, not actual DEXA scan
+                measurements. Body-fat percentage is estimated using circumference measurements.
+                Lean body mass includes more than muscle. Visceral fat is not directly measured.
+                For accurate body composition, consult a qualified professional or use a validated
+                body-composition assessment device.
+            </div>
+
+            {% else %}
+
+            <div class="composition-empty">
+                Body-composition calculations are not available for this assessment.
+                BMI may still be calculated from height and weight. Enter waist, neck,
+                sex and other required measurements to calculate additional estimates.
+            </div>
+
+            {% endif %}
+
+        </div>
+
         <!-- WORKOUT DETAILS -->
+
+        <h2 style="margin-top:30px;">Workout Plan Details</h2>
 
         <div class="workout-info">
 
@@ -546,6 +1044,10 @@
         <!-- RECOMMENDED EXERCISES -->
 
         <h2>Recommended Exercises</h2>
+
+        <p class="section-description">
+            These exercises are selected based on your fitness level, goal and available equipment.
+        </p>
 
         <div class="exercise-grid">
 
@@ -733,7 +1235,7 @@
 
 <script>
 
-// Equipment Yes / No functionality
+// EQUIPMENT YES / NO FUNCTIONALITY
 
 const hasEquipment = document.getElementById("has_equipment");
 
@@ -777,12 +1279,54 @@ if (hasEquipment) {
 }
 
 
-// Start Workout AJAX functionality
+// BODY MEASUREMENT FORM INTERACTION
+
+const sexSelect = document.getElementById("sex");
+const hipGroup = document.getElementById("hipGroup");
+const hipInput = document.getElementById("hip_cm");
+
+
+function updateHipField() {
+
+    if (!sexSelect || !hipGroup || !hipInput) {
+        return;
+    }
+
+    // Hip measurement is especially needed for the female formula.
+    if (sexSelect.value === "F") {
+
+        hipGroup.style.display = "flex";
+
+        hipInput.required = true;
+
+    } else {
+
+        hipGroup.style.display = "flex";
+
+        hipInput.required = false;
+
+    }
+
+}
+
+
+if (sexSelect) {
+
+    sexSelect.addEventListener("change", updateHipField);
+
+    updateHipField();
+
+}
+
+
+// START WORKOUT AJAX FUNCTIONALITY
 
 const startWorkoutForm = document.getElementById("startWorkoutForm");
 const completeWorkoutForm = document.getElementById("completeWorkoutForm");
+
 let activeWorkoutId = null;
 let completionInProgress = false;
+
 
 if (startWorkoutForm) {
 
@@ -827,10 +1371,12 @@ if (startWorkoutForm) {
             }
 
             activeWorkoutId = data.workout_id;
+
             completeWorkoutForm.action = completeWorkoutForm.action.replace(
                 /\/0\/$/,
                 "/" + activeWorkoutId + "/"
             );
+
             completeWorkoutForm.hidden = false;
 
             message.innerHTML =
@@ -857,6 +1403,9 @@ if (startWorkoutForm) {
 
 }
 
+
+// COMPLETE WORKOUT AJAX FUNCTIONALITY
+
 if (completeWorkoutForm) {
 
     completeWorkoutForm.addEventListener("submit", async function(event) {
@@ -868,13 +1417,17 @@ if (completeWorkoutForm) {
         }
 
         const button = completeWorkoutForm.querySelector("button");
+
         const message = document.getElementById("workoutMessage");
+
         const csrfToken = completeWorkoutForm.querySelector(
             '[name="csrfmiddlewaretoken"]'
         ).value;
 
         completionInProgress = true;
+
         button.disabled = true;
+
         button.textContent = "Completing...";
 
         try {
@@ -892,9 +1445,11 @@ if (completeWorkoutForm) {
             const data = await response.json();
 
             if (!response.ok || data.status !== "success") {
+
                 throw new Error(
                     data.message || "Unable to complete your workout."
                 );
+
             }
 
             message.innerHTML =
@@ -912,6 +1467,7 @@ if (completeWorkoutForm) {
                 "</div>";
 
             button.disabled = false;
+
             button.textContent = "Complete Workout";
 
         } finally {

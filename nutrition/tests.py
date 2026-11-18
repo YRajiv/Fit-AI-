@@ -1,164 +1,800 @@
 import base64
-import binascii
 import io
 import json
-import logging
-import math
-import time
+import tempfile
 
-from PIL import Image, UnidentifiedImageError
+from unittest.mock import Mock, patch
 
-from django.conf import settings
-from django.http import JsonResponse
-from django.shortcuts import render
-from django.views.decorators.http import require_POST
+from PIL import Image
 
-from google import genai
-from google.genai import types
+from django.test import TestCase, override_settings
+from django.urls import reverse
 
-from nutrition.models import FoodScan
+from django.contrib.auth.models import User
+from nutrition.models import FoodScan, NutritionGoal, WaterIntake
 
 
-logger = logging.getLogger(__name__)
+def create_test_image():
+    """Create a small valid image for testing."""
+    image = Image.new("RGB", (10, 10), color="red")
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    return f"data:image/png;base64,{encoded}"
 
 
-def nutrition_page_view(request):
-    return render(request, 'nutrition/nutrition.html')
+def valid_nutrition_data():
+    return {
+        "food_name": "Chicken Rice",
+        "calories": 450,
+        "protein": 30,
+        "carbs": 50,
+        "fat": 12,
+        "fiber": 4,
+        "sugar": 3,
+        "ai_tip": "A balanced meal with good protein."
+    }
 
 
-def _error(message, status):
-    return JsonResponse({'success': False, 'error': message}, status=status)
+class NutritionTestBase(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="nutritionuser",
+            password="TestPassword123"
+        )
+
+        self.scan_url = reverse("scan_food")
+        self.page_url = reverse("nutrition_page")
+
+        self.image_data = create_test_image()
+
+        self.temp_media = tempfile.TemporaryDirectory()
+
+        self.media_override = override_settings(
+            MEDIA_ROOT=self.temp_media.name,
+            GEMINI_API_KEY="test-api-key",
+            GEMINI_MODEL="test-model"
+        )
+
+        self.media_override.enable()
+
+    def tearDown(self):
+        self.media_override.disable()
+        self.temp_media.cleanup()
+
+    def login(self):
+        self.client.login(
+            username="nutritionuser",
+            password="TestPassword123"
+        )
+
+    def send_scan(self, payload=None):
+        if payload is None:
+            payload = {"image": self.image_data}
+
+        return self.client.post(
+            self.scan_url,
+            data=json.dumps(payload),
+            content_type="application/json"
+        )
 
 
-def _nutrition_image(image_data_url):
-    if not isinstance(image_data_url, str) or not image_data_url.startswith('data:image/'):
-        raise ValueError('Please provide a valid food image.')
+# ============================================================
+# NUTRITION PAGE TESTS
+# ============================================================
 
-    header, separator, encoded_image = image_data_url.partition(',')
-    if not separator or ';base64' not in header:
-        raise ValueError('The image data is invalid. Please capture the image again.')
+class NutritionPageTests(NutritionTestBase):
 
-    try:
-        image_bytes = base64.b64decode(encoded_image, validate=True)
-        with Image.open(io.BytesIO(image_bytes)) as image:
-            image.verify()
-        with Image.open(io.BytesIO(image_bytes)) as image:
-            return image.convert('RGB')
-    except (binascii.Error, UnidentifiedImageError, OSError, ValueError) as error:
-        raise ValueError('The image could not be read. Please capture it again.') from error
+    def test_nutrition_page_opens(self):
+        response = self.client.get(self.page_url)
 
+        self.assertEqual(response.status_code, 200)
 
-def _parse_nutrition(response_text):
-    try:
-        nutrition_data = json.loads(response_text)
-    except (TypeError, json.JSONDecodeError) as error:
-        raise ValueError('The nutrition service returned an invalid response. Please try again.') from error
+    def test_nutrition_page_uses_correct_template(self):
+        response = self.client.get(self.page_url)
 
-    if not isinstance(nutrition_data, dict):
-        raise ValueError('The nutrition service returned an invalid response. Please try again.')
+        self.assertTemplateUsed(
+            response,
+            "nutrition/nutrition.html"
+        )
 
-    nutrition_data['food_name'] = str(nutrition_data.get('food_name') or 'Scanned meal')[:100]
-    for key in ('calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar'):
-        try:
-            value = float(nutrition_data[key])
-        except (KeyError, TypeError, ValueError) as error:
-            raise ValueError('The nutrition service returned incomplete nutrition values. Please scan again.') from error
-        if not math.isfinite(value) or value < 0:
-            raise ValueError('The nutrition service returned invalid nutrition values. Please scan again.')
-        nutrition_data[key] = value
+    def test_nutrition_page_allows_logged_in_user(self):
+        self.login()
 
-    nutrition_data.setdefault('ai_tip', 'Enjoy your meal and keep tracking your nutrition!')
-    return nutrition_data
+        response = self.client.get(self.page_url)
+
+        self.assertEqual(response.status_code, 200)
 
 
-@require_POST
-def scan_food_view(request):
-    if not request.user.is_authenticated:
-        return _error('Please sign in to scan food.', 401)
+# ============================================================
+# FOOD SCAN AUTHENTICATION TESTS
+# ============================================================
 
-    try:
-        data = json.loads(request.body)
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return _error('Invalid request data. Please try again.', 400)
+class FoodScanAuthenticationTests(NutritionTestBase):
 
-    if not isinstance(data, dict) or not data.get('image'):
-        return _error('No image data provided.', 400)
+    def test_scan_requires_login(self):
+        response = self.send_scan()
 
-    try:
-        image = _nutrition_image(data['image'])
-    except ValueError as error:
-        return _error(str(error), 400)
+        self.assertEqual(response.status_code, 401)
 
-    api_key = getattr(settings, 'GEMINI_API_KEY', None)
-    if not api_key:
-        logger.error('Food scan requested but GEMINI_API_KEY is not configured.')
-        return _error('Food scanning is not configured. Please contact the site administrator.', 503)
+        data = response.json()
 
-    prompt = """
-    Identify the food in this image and estimate the nutrition for the visible serving.
-    Return a JSON object with these fields: food_name (string), calories (number),
-    protein (grams), carbs (grams), fat (grams), fiber (grams), sugar (grams),
-    and ai_tip (a short helpful nutrition tip). Return estimates, not serving-size
-    claims that cannot be determined from the image.
-    """
+        self.assertFalse(data["success"])
+        self.assertIn("sign in", data["error"].lower())
 
-    model_name = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
-    response = None
-    hit_quota_limit = False
+    def test_scan_accepts_logged_in_user(self):
+        self.login()
 
-    for attempt in range(2):
-        try:
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[image, prompt],
-                config=types.GenerateContentConfig(response_mime_type='application/json'),
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                Mock(text=json.dumps(valid_nutrition_data())),
+                "gemini"
             )
-            break
-        except Exception as error:
-            logger.exception('Gemini food scan failed using model %s.', model_name)
-            message = str(error).upper()
-            
-            # Check if quota limit (429 / Resource Exhausted) was reached
-            if '429' in message or 'RESOURCE_EXHAUSTED' in message:
-                hit_quota_limit = True
-                break
 
-            if attempt == 0 and ('503' in message or 'UNAVAILABLE' in message):
-                time.sleep(2)
-                continue
-            return _error('Could not analyze the food image right now. Please try again.', 502)
+            response = self.send_scan()
 
-    # --- AUTOMATIC FALLBACK DATA WHEN API QUOTA IS EXHAUSTED ---
-    if hit_quota_limit or not response:
-        nutrition_data = {
-            'food_name': 'Chicken Biryani (Daily Quota Fallback)',
-            'calories': 520.0,
-            'protein': 32.0,
-            'carbs': 58.0,
-            'fat': 14.0,
-            'fiber': 4.0,
-            'sugar': 2.0,
-            'ai_tip': 'API quota reached for today, showing fallback data. High protein detected!'
+        self.assertEqual(response.status_code, 200)
+
+
+# ============================================================
+# HTTP METHOD TESTS
+# ============================================================
+
+class FoodScanMethodTests(NutritionTestBase):
+
+    def test_get_request_is_rejected(self):
+        self.login()
+
+        response = self.client.get(self.scan_url)
+
+        self.assertEqual(response.status_code, 405)
+
+
+# ============================================================
+# REQUEST VALIDATION TESTS
+# ============================================================
+
+class FoodScanValidationTests(NutritionTestBase):
+
+    def test_invalid_json_is_rejected(self):
+        self.login()
+
+        response = self.client.post(
+            self.scan_url,
+            data="{invalid json",
+            content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_json_array_is_rejected(self):
+        self.login()
+
+        response = self.client.post(
+            self.scan_url,
+            data=json.dumps(["image"]),
+            content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_json_string_is_rejected(self):
+        self.login()
+
+        response = self.client.post(
+            self.scan_url,
+            data=json.dumps("hello"),
+            content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_image_is_rejected(self):
+        self.login()
+
+        response = self.send_scan({})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_empty_image_is_rejected(self):
+        self.login()
+
+        response = self.send_scan({"image": ""})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_image_data_is_rejected(self):
+        self.login()
+
+        response = self.send_scan({
+            "image": "not-an-image"
+        })
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_base64_is_rejected(self):
+        self.login()
+
+        response = self.send_scan({
+            "image": "data:image/png;base64,%%%invalid%%%"
+        })
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_corrupted_image_is_rejected(self):
+        self.login()
+
+        fake_image = base64.b64encode(
+            b"This is not a real image"
+        ).decode()
+
+        response = self.send_scan({
+            "image": f"data:image/png;base64,{fake_image}"
+        })
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_image_without_base64_header_is_rejected(self):
+        self.login()
+
+        response = self.send_scan({
+            "image": "data:image/png,invalid"
+        })
+
+        self.assertEqual(response.status_code, 400)
+
+
+# ============================================================
+# API CONFIGURATION TESTS
+# ============================================================
+
+class FoodScanConfigurationTests(NutritionTestBase):
+
+    def test_missing_api_key_returns_503(self):
+        self.login()
+
+        with override_settings(GEMINI_API_KEY=None):
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 503)
+
+        self.assertFalse(response.json()["success"])
+
+    def test_gemini_client_initialization_failure_returns_503(self):
+        self.login()
+
+        with patch(
+            "nutrition.views.genai.Client",
+            side_effect=Exception("Client initialization failed")
+        ):
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 503)
+
+        self.assertFalse(response.json()["success"])
+
+
+# ============================================================
+# AI PROVIDER TESTS
+# ============================================================
+
+class FoodScanAITests(NutritionTestBase):
+
+    def test_successful_gemini_response(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini-test-model"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+
+        self.assertTrue(data["success"])
+        self.assertEqual(
+            data["nutrition"]["food_name"],
+            "Chicken Rice"
+        )
+
+        fallback.assert_called_once()
+
+    def test_groq_response_format_is_supported(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+
+        mock_response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(nutrition)
+                    }
+                }
+            ]
         }
-    else:
-        try:
-            nutrition_data = _parse_nutrition(response.text if response else None)
-        except ValueError as error:
-            logger.warning('Gemini returned invalid nutrition data: %s', error)
-            return _error(str(error), 502)
 
-    # Save to database for dashboard tracking
-    FoodScan.objects.create(
-        user=request.user,
-        food_name=nutrition_data['food_name'],
-        calories=nutrition_data['calories'],
-        protein=nutrition_data['protein'],
-        carbohydrates=nutrition_data['carbs'],
-        fats=nutrition_data['fat'],
-        fiber=nutrition_data['fiber'],
-        quantity='1 serving',
-        is_consumed=True,
-    )
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
 
-    return JsonResponse({'success': True, 'nutrition': nutrition_data})
+            fallback.return_value = (
+                mock_response,
+                "groq"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.json()["nutrition"]["food_name"],
+            "Chicken Rice"
+        )
+
+    def test_openai_response_format_is_supported(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message = Mock()
+        mock_response.choices[0].message.content = json.dumps(nutrition)
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "openai"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.json()["nutrition"]["food_name"],
+            "Chicken Rice"
+        )
+
+    def test_all_ai_providers_failing_returns_503(self):
+        self.login()
+
+        with patch("nutrition.views.genai.Client"), \
+             patch(
+                 "nutrition.views.fallback_chain",
+                 side_effect=Exception("All providers failed")
+             ):
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 503)
+
+        self.assertFalse(response.json()["success"])
+
+    def test_invalid_ai_json_returns_502(self):
+        self.login()
+
+        mock_response = Mock(
+            text="This is not JSON"
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 502)
+
+        self.assertFalse(response.json()["success"])
+
+    def test_ai_response_with_missing_nutrition_values_returns_502(self):
+        self.login()
+
+        incomplete_data = {
+            "food_name": "Rice",
+            "calories": 200
+        }
+
+        mock_response = Mock(
+            text=json.dumps(incomplete_data)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 502)
+
+    def test_ai_response_with_negative_calories_returns_502(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+        nutrition["calories"] = -100
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 502)
+
+    def test_ai_response_with_nan_value_returns_502(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+        nutrition["protein"] = float("nan")
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 502)
+
+    def test_food_name_defaults_when_missing(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+        nutrition["food_name"] = ""
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.json()["nutrition"]["food_name"],
+            "Scanned meal"
+        )
+
+    def test_food_name_is_limited_to_100_characters(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+        nutrition["food_name"] = "A" * 150
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            len(response.json()["nutrition"]["food_name"]),
+            100
+        )
+
+
+# ============================================================
+# DATABASE TESTS
+# ============================================================
+
+class FoodScanDatabaseTests(NutritionTestBase):
+
+    def test_successful_scan_saves_food_to_database(self):
+        self.login()
+
+        nutrition = valid_nutrition_data()
+
+        mock_response = Mock(
+            text=json.dumps(nutrition)
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            FoodScan.objects.filter(user=self.user).count(),
+            1
+        )
+
+        food = FoodScan.objects.get(user=self.user)
+
+        self.assertEqual(food.food_name, "Chicken Rice")
+        self.assertEqual(food.calories, 450)
+        self.assertEqual(food.protein, 30)
+        self.assertEqual(food.carbohydrates, 50)
+        self.assertEqual(food.fats, 12)
+        self.assertEqual(food.fiber, 4)
+        self.assertEqual(food.quantity, "1 serving")
+        self.assertTrue(food.is_consumed)
+
+    def test_food_scan_is_saved_with_image(self):
+        self.login()
+
+        mock_response = Mock(
+            text=json.dumps(valid_nutrition_data())
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 200)
+
+        food = FoodScan.objects.get(user=self.user)
+
+        self.assertTrue(food.image)
+        self.assertTrue(food.image.name.endswith(".jpg"))
+
+        with food.image.open("rb") as saved_image:
+            image = Image.open(saved_image)
+            image.verify()
+
+    def test_scan_is_not_saved_when_ai_fails(self):
+        self.login()
+
+        with patch("nutrition.views.genai.Client"), \
+             patch(
+                 "nutrition.views.fallback_chain",
+                 side_effect=Exception("AI failure")
+             ):
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 503)
+
+        self.assertEqual(
+            FoodScan.objects.filter(user=self.user).count(),
+            0
+        )
+
+    def test_scan_is_not_saved_when_ai_data_is_invalid(self):
+        self.login()
+
+        mock_response = Mock(
+            text="Invalid AI data"
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            response = self.send_scan()
+
+        self.assertEqual(response.status_code, 502)
+
+        self.assertEqual(
+            FoodScan.objects.filter(user=self.user).count(),
+            0
+        )
+
+    def test_food_scan_belongs_to_correct_user(self):
+        self.login()
+
+        mock_response = Mock(
+            text=json.dumps(valid_nutrition_data())
+        )
+
+        with patch("nutrition.views.genai.Client"), \
+             patch("nutrition.views.fallback_chain") as fallback:
+
+            fallback.return_value = (
+                mock_response,
+                "gemini"
+            )
+
+            self.send_scan()
+
+        food = FoodScan.objects.first()
+
+        self.assertEqual(food.user, self.user)
+
+
+# ============================================================
+# NUTRITION MODEL TESTS
+# ============================================================
+
+class NutritionModelTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="modeluser",
+            password="TestPassword123"
+        )
+
+    def test_nutrition_goal_creation(self):
+        goal = NutritionGoal.objects.create(
+            user=self.user,
+            calories_target=2200,
+            protein_target=120,
+            carbs_target=250,
+            fat_target=70
+        )
+
+        self.assertEqual(goal.user, self.user)
+        self.assertEqual(goal.calories_target, 2200)
+
+    def test_nutrition_goal_string_representation(self):
+        goal = NutritionGoal.objects.create(
+            user=self.user,
+            calories_target=2200,
+            protein_target=120,
+            carbs_target=250,
+            fat_target=70
+        )
+
+        self.assertEqual(str(goal), "modeluser")
+
+    def test_user_can_only_have_one_nutrition_goal(self):
+        NutritionGoal.objects.create(
+            user=self.user,
+            calories_target=2200,
+            protein_target=120,
+            carbs_target=250,
+            fat_target=70
+        )
+
+        with self.assertRaises(Exception):
+            NutritionGoal.objects.create(
+                user=self.user,
+                calories_target=2000,
+                protein_target=100,
+                carbs_target=200,
+                fat_target=60
+            )
+
+    def test_water_intake_creation(self):
+        water = WaterIntake.objects.create(
+            user=self.user,
+            water_amount=0.5
+        )
+
+        self.assertEqual(water.user, self.user)
+        self.assertEqual(water.water_amount, 0.5)
+        self.assertEqual(water.target_amount, 3)
+
+    def test_water_target_can_be_changed(self):
+        water = WaterIntake.objects.create(
+            user=self.user,
+            water_amount=1,
+            target_amount=4
+        )
+
+        self.assertEqual(water.target_amount, 4)
+
+    def test_food_scan_user_relationship(self):
+        food = FoodScan.objects.create(
+            user=self.user,
+            food_name="Apple",
+            calories=95,
+            protein=0.5,
+            carbohydrates=25,
+            fats=0.3,
+            fiber=4,
+            quantity="1 apple",
+            is_consumed=True
+        )
+
+        self.assertEqual(food.user, self.user)
+        self.assertEqual(food.food_name, "Apple")
+
+    def test_deleting_user_deletes_food_scans(self):
+        FoodScan.objects.create(
+            user=self.user,
+            food_name="Apple",
+            calories=95,
+            protein=0.5,
+            carbohydrates=25,
+            fats=0.3,
+            fiber=4,
+            quantity="1 apple"
+        )
+
+        self.user.delete()
+
+        self.assertEqual(FoodScan.objects.count(), 0)
+
+    def test_deleting_user_deletes_nutrition_goal(self):
+        NutritionGoal.objects.create(
+            user=self.user,
+            calories_target=2200,
+            protein_target=120,
+            carbs_target=250,
+            fat_target=70
+        )
+
+        self.user.delete()
+
+        self.assertEqual(NutritionGoal.objects.count(), 0)
+
+    def test_deleting_user_deletes_water_intake(self):
+        WaterIntake.objects.create(
+            user=self.user,
+            water_amount=1
+        )
+
+        self.user.delete()
+
+        self.assertEqual(WaterIntake.objects.count(), 0)
+

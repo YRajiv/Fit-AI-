@@ -1,4 +1,3 @@
-
 {% load static %}
 
 <!DOCTYPE html>
@@ -11,76 +10,537 @@
     <title>FitAI Dashboard</title>
 
     <link rel="stylesheet" href="{% static 'dashboard/style.css' %}">
+
+    <style>
+        /* =========================
+           DASHBOARD LAYOUT
+        ========================= */
+
+        .content {
+            min-width: 0;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        .live-date {
+            text-align: right;
+            color: #cbd5e1;
+            font-size: 13px;
+        }
+
+        .live-clock {
+            font-size: 22px;
+            font-weight: 700;
+            color: #38e8a7;
+            margin-top: 5px;
+        }
+
+        /* STATISTICS */
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stats .card {
+            min-width: 0;
+        }
+
+        /* MAIN CARDS */
+
+        .dashboard-grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 20px !important;
+            align-items: stretch;
+            margin-bottom: 25px;
+        }
+
+        .dashboard-card {
+            min-width: 0;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.045);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .dashboard-card h2 {
+            margin-top: 0;
+            margin-bottom: 18px;
+        }
+
+        /* =========================
+           WORKOUT CARD
+        ========================= */
+
+        .workout-card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .workout-image {
+            width: 100%;
+            max-height: 230px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .workout-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+            overflow-wrap: anywhere;
+        }
+
+        .workout-category {
+            color: #c084fc;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .workout-circle {
+            width: 105px;
+            height: 105px;
+            border-radius: 50%;
+            border: 6px solid #38e8a7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+            font-size: 21px;
+            font-weight: 700;
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(56, 232, 167, 0.2);
+        }
+
+        .workout-status {
+            margin-top: 10px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .status-completed {
+            color: #38e8a7;
+        }
+
+        .status-progress {
+            color: #fbbf24;
+        }
+
+        .workout-info {
+            color: #cbd5e1;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .workout-action {
+            display: inline-block;
+            margin-top: auto;
+            padding: 10px 14px;
+            background: #6366f1;
+            color: white;
+            border-radius: 9px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .workout-action:hover {
+            background: #818cf8;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 25px 10px;
+        }
+
+        .empty-state p {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* =========================
+           BODY COMPOSITION
+        ========================= */
+
+        .body-composition-card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .assessment-date {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+
+        .body-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+        }
+
+        .body-metric-label {
+            color: #cbd5e1;
+            font-size: 13px;
+        }
+
+        .body-metric-value {
+            color: #38e8a7;
+            text-align: right;
+            font-weight: 700;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .risk-value {
+            color: #fbbf24;
+        }
+
+        .body-composition-note {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 10px;
+        }
+
+        .body-composition-note p {
+            color: #94a3b8;
+            font-size: 11px;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+
+        .body-composition-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #6366f1;
+            color: white;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .body-composition-link:hover {
+            background: #818cf8;
+        }
+
+        /* =========================
+           BOTTOM GRID
+        ========================= */
+
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .bottom-card {
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.045);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(12px);
+        }
+
+        .bottom-card h2 {
+            margin-top: 0;
+        }
+
+        /* WATER BUTTONS */
+
+        .water-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .water-button {
+            cursor: pointer;
+            padding: 6px 9px;
+            font-size: 11px;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .water-button:hover {
+            opacity: 0.8;
+        }
+
+        /* PROGRESS */
+
+        .progress-track {
+            height: 9px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: #38e8a7;
+            border-radius: 20px;
+            transition: width 0.6s ease;
+        }
+
+        /* DIET */
+
+        .meal-item {
+            margin-bottom: 12px;
+        }
+
+        .meal-name {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .meal-food {
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 500;
+            margin: 4px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .meal-details {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 11px;
+        }
+
+        /* REMINDERS */
+
+        .dashboard-reminder {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .reminder-title {
+            margin: 0;
+            color: #f8fafc;
+            font-size: 13px;
+        }
+
+        .reminder-time {
+            margin: 5px 0 0;
+            color: #c084fc;
+            font-size: 12px;
+        }
+
+        .reminder-repeat {
+            margin: 5px 0 0;
+            color: #94a3b8;
+            font-size: 11px;
+        }
+
+        /* LOGIN AND LOGOUT */
+
+        .logout-item,
+        .login-item {
+            list-style: none;
+            margin-top: 15px;
+            padding: 0;
+        }
+
+        .logout-item form {
+            width: 100%;
+            margin: 0;
+        }
+
+        .logout-btn,
+        .login-item a {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 13px 16px;
+            background: rgba(239, 68, 68, 0.15);
+            color: white;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            text-align: left;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .logout-btn:hover,
+        .login-item a:hover {
+            background: #dc3545;
+        }
+
+        /* =========================
+           RESPONSIVE
+        ========================= */
+
+        @media (max-width: 1100px) {
+
+            .bottom-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 768px) {
+
+            .dashboard-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-header {
+                align-items: flex-start;
+            }
+
+            .live-date {
+                text-align: left;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 450px) {
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .body-metric {
+                padding: 10px;
+            }
+
+            .body-metric-label {
+                font-size: 12px;
+            }
+
+            .body-metric-value {
+                font-size: 13px;
+            }
+
+        }
+
+    </style>
+
 </head>
 
 <body>
 
 <div class="dashboard">
 
-    <!-- SIDEBAR -->
+    <!-- =========================
+         SIDEBAR
+    ========================= -->
 
     <aside class="sidebar">
 
         <h1>🏋 FitAI</h1>
+
         <p>Stronger Every Day</p>
 
         <ul>
 
             <li class="active">
-                <a href="/" style="color: inherit; text-decoration: none;">
+                <a href="/" style="color:inherit;text-decoration:none;">
                     🏠 Dashboard
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'nutrition_page' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'nutrition_page' %}" style="color:inherit;text-decoration:none;">
                     🥗 Nutrition
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'workout:workouts' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'workout:workouts' %}" style="color:inherit;text-decoration:none;">
                     💪 Workout
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'ai_features:posture_check' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'ai_features:posture_check' %}" style="color:inherit;text-decoration:none;">
                     🤖 AI Posture Check
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'dashboard:chat' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'dashboard:chat' %}" style="color:inherit;text-decoration:none;">
                     💬 AI Fitness Assistant
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'diet_dashboard' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'diet_dashboard' %}" style="color:inherit;text-decoration:none;">
                     🍎 Diet Plan
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'reminders:reminders' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'reminders:reminders' %}" style="color:inherit;text-decoration:none;">
                     🔔 Reminders
                 </a>
             </li>
 
             <li>
-                <a href="{% url 'progress:progress' %}" style="color: inherit; text-decoration: none;">
+                <a href="{% url 'progress:progress' %}" style="color:inherit;text-decoration:none;">
                     📊 Progress
                 </a>
             </li>
-
-            <!-- LOGIN / LOGOUT -->
 
             {% if user.is_authenticated %}
 
                 <li class="logout-item">
 
                     <form action="{% url 'users:logout' %}" method="POST">
+
                         {% csrf_token %}
 
                         <button type="submit" class="logout-btn">
@@ -108,38 +568,42 @@
     </aside>
 
 
-    <!-- MAIN CONTENT -->
+    <!-- =========================
+         MAIN CONTENT
+    ========================= -->
 
     <main class="content">
 
         <!-- HEADER -->
 
-        <header>
+        <header class="dashboard-header">
 
             <div>
 
-                <h1>
-                    Welcome to FitAI 👋
-                </h1>
+                <h1>Welcome to FitAI 👋</h1>
 
                 <p>Stay consistent, stay strong!</p>
 
             </div>
 
-            <div class="date">
+            <div class="live-date">
 
-                {% now "l, d F Y" %}
+                <div id="liveDate">
+                    {% now "l, d F Y" %}
+                </div>
 
-                <br>
-
-                {% now "h:i A" %}
+                <div class="live-clock" id="liveClock">
+                    {% now "h:i:s A" %}
+                </div>
 
             </div>
 
         </header>
 
 
-        <!-- STATISTICS -->
+        <!-- =========================
+             STATISTICS
+        ========================= -->
 
         <div class="stats">
 
@@ -150,7 +614,7 @@
                 <h3>🔥 Calories Burned</h3>
 
                 <h1>
-                    {{ daily_progress.activity_calories|default:"0" }}
+                    {{ daily_progress.activity_calories|default:0 }}
                 </h1>
 
                 <p>kcal today</p>
@@ -165,16 +629,17 @@
                 <h3>🥩 Protein Intake</h3>
 
                 <h1>
-                    {{ consumed_protein|default:"0" }}g
+                    {{ consumed_protein|default:0 }}g
                 </h1>
 
                 <p>
-                    g / {{ nutrition_goal.protein_target|default:"0" }}g Target
+                    {{ consumed_protein|default:0 }}g /
+                    {{ nutrition_goal.protein_target|default:0 }}g Target
                 </p>
 
                 {% if planned_protein_today > 0 %}
 
-                    <p style="font-size:10px; color:#c084fc; margin-top:4px;">
+                    <p style="font-size:11px;color:#c084fc;">
                         Diet Plan Target: ~{{ planned_protein_today }}g
                     </p>
 
@@ -190,15 +655,14 @@
                 <h3>💧 Water Intake</h3>
 
                 <h1>
-                    {{ water_intake.water_amount|default:"0" }}
+                    {{ water_intake.water_amount|default:0 }}
                 </h1>
 
                 <p>
-                    Liters / {{ water_intake.target_amount|default:"3" }}L
+                    Liters / {{ water_intake.target_amount|default:3 }}L
                 </p>
 
-                <div style="display:flex; gap:4px; margin-top:10px;
-                            justify-content:center; flex-wrap:wrap;">
+                <div class="water-buttons">
 
                     <form action="{% url 'dashboard:add_water_quick' %}" method="POST">
                         {% csrf_token %}
@@ -230,7 +694,7 @@
                 <h3>❤️ Active Time</h3>
 
                 <h1>
-                    {{ daily_progress.active_minutes|default:"0" }}
+                    {{ daily_progress.active_minutes|default:0 }}
                 </h1>
 
                 <p>Minutes Today</p>
@@ -245,7 +709,7 @@
                 <h3>💪 Completed Workouts</h3>
 
                 <h1>
-                    {{ completed_workout_count|default:"0" }}
+                    {{ completed_workout_count|default:0 }}
                 </h1>
 
                 <p>Workouts Today</p>
@@ -255,75 +719,327 @@
         </div>
 
 
-        <!-- TODAY'S WORKOUT -->
+        <!-- =========================
+             WORKOUT + BODY COMPOSITION
+        ========================= -->
 
-        <div class="grid">
+        <div class="dashboard-grid">
 
-            <div class="glass workout">
+            <!-- TODAY'S WORKOUT -->
 
-                <h2>Today's Workout</h2>
+            <div class="dashboard-card workout-card">
+
+                <h2>💪 Today's Workout</h2>
 
                 {% if workout %}
 
                     {% if workout.exercise_image %}
 
-                        <img src="{{ workout.exercise_image.url }}"
-                             alt="{{ workout.workout_name }}">
+                        <img
+                            src="{{ workout.exercise_image.url }}"
+                            alt="{{ workout.workout_name }}"
+                            class="workout-image"
+                        >
 
                     {% endif %}
 
-                    <h3>{{ workout.workout_name }}</h3>
+                    <div class="workout-name">
+                        {{ workout.workout_name|default:"Workout" }}
+                    </div>
 
-                    <p>
-                        Category: {{ workout.workout_category }}
-                    </p>
+                    <div class="workout-category">
 
-                    <div class="circle">
-
-                        {{ workout.completed_reps|default:"0" }}
-
-                        /
-
-                        {{ workout.target_reps|default:"0" }}
+                        Category:
+                        {{ workout.workout_category|default:"General Fitness" }}
 
                     </div>
 
-                    <p>
+                    <div class="workout-circle">
 
-                        {% if workout.is_completed %}
+                        {{ workout.completed_reps|default:0 }}
+                        /
+                        {{ workout.target_reps|default:0 }}
 
-                            <span style="color:#38e8a7;">
-                                ✅ Workout Completed
-                            </span>
+                    </div>
 
-                        {% else %}
+                    {% if workout.is_completed %}
 
-                            <span style="color:#fbbf24;">
-                                ⏳ Workout In Progress
-                            </span>
+                        <div class="workout-status status-completed">
+                            ✅ Workout Completed
+                        </div>
 
-                        {% endif %}
+                    {% else %}
 
-                    </p>
+                        <div class="workout-status status-progress">
+                            ⏳ Workout In Progress
+                        </div>
 
-                    <p>
-                        Form Status: {{ workout.form_status }}
-                    </p>
+                    {% endif %}
 
-                    <p>
-                        Duration: {{ workout.duration }} minutes
-                    </p>
+                    <div class="workout-info">
+
+                        <p>
+                            <strong>Form Status:</strong>
+                            {{ workout.form_status|default:"Not Checked" }}
+                        </p>
+
+                        <p>
+                            <strong>Duration:</strong>
+                            {{ workout.duration|default:0 }} minutes
+                        </p>
+
+                    </div>
+
+                    <a href="{% url 'workout:workouts' %}" class="workout-action">
+                        View Workout Details →
+                    </a>
 
                 {% else %}
 
-                    <p>No workout today.</p>
+                    <div class="empty-state">
 
-                    <a href="{% url 'workout:workouts' %}"
-                       style="color:#c084fc; text-decoration:none;">
+                        <div style="font-size:45px;">🏋️</div>
 
-                        Start a Workout →
+                        <h3>No Workout Logged Today</h3>
 
+                        <p>
+                            Your workout will appear here after you
+                            start or log a workout.
+                        </p>
+
+                        <a href="{% url 'workout:workouts' %}" class="workout-action">
+                            Start Today's Workout →
+                        </a>
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- BODY COMPOSITION -->
+
+            <div class="dashboard-card body-composition-card">
+
+                <h2>🧬 Body Composition</h2>
+
+                {% if body_composition %}
+
+                    <div class="assessment-date">
+
+                        Latest assessment:
+
+                        {{ body_composition.measurement_date|date:"d M Y" }}
+
+                    </div>
+
+
+                    <!-- BMI -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            ⚖️ BMI
+                        </div>
+
+                        <div class="body-metric-value">
+                            {{ body_composition.BMI|default:"--" }}
+                        </div>
+
+                    </div>
+
+
+                    <!-- BODY FAT -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            🔥 Body Fat
+                        </div>
+
+                        <div class="body-metric-value">
+
+                            {% if body_composition.body_fat_percent != None %}
+
+                                {{ body_composition.body_fat_percent }}%
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- FAT MASS -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            🟠 Fat Mass
+                        </div>
+
+                        <div class="body-metric-value">
+
+                            {% if body_composition.fat_mass_kg != None %}
+
+                                {{ body_composition.fat_mass_kg }} kg
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- LEAN MASS -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            💪 Lean Body Mass
+                        </div>
+
+                        <div class="body-metric-value">
+
+                            {% if body_composition.lean_body_mass_kg != None %}
+
+                                {{ body_composition.lean_body_mass_kg }} kg
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- WAIST TO HEIGHT -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            📏 Waist / Height Ratio
+                        </div>
+
+                        <div class="body-metric-value">
+
+                            {% if body_composition.waist_to_height_ratio != None %}
+
+                                {{ body_composition.waist_to_height_ratio }}
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- VISCERAL FAT RISK -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            🫀 Visceral Fat Risk
+                        </div>
+
+                        <div class="body-metric-value risk-value">
+
+                            {% if body_composition.visceral_fat_risk %}
+
+                                {{ body_composition.visceral_fat_risk }}
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- BMR -->
+
+                    <div class="body-metric">
+
+                        <div class="body-metric-label">
+                            ⚡ BMR
+                        </div>
+
+                        <div class="body-metric-value">
+
+                            {% if body_composition.BMR != None %}
+
+                                {{ body_composition.BMR }} kcal/day
+
+                            {% else %}
+
+                                --
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- DISCLAIMER -->
+
+                    <div class="body-composition-note">
+
+                        <p>
+                            ℹ️ These are formula-based estimates,
+                            not actual DEXA scan results.
+                        </p>
+
+                        <p>
+                            Lean body mass is not the same as skeletal
+                            muscle mass. Visceral fat risk is an indicator,
+                            not a direct measurement.
+                        </p>
+
+                    </div>
+
+
+                    <a href="{% url 'workout:workouts' %}" class="body-composition-link">
+                        Update Assessment →
                     </a>
+
+                {% else %}
+
+                    <div class="empty-state">
+
+                        <div style="font-size:45px;">🧬</div>
+
+                        <h3>No Assessment Yet</h3>
+
+                        <p>
+                            Complete your body composition assessment
+                            to see your latest metrics here.
+                        </p>
+
+                        <a href="{% url 'workout:workouts' %}" class="body-composition-link">
+                            Calculate My Body Composition →
+                        </a>
+
+                    </div>
 
                 {% endif %}
 
@@ -332,18 +1048,21 @@
         </div>
 
 
-        <!-- BOTTOM SECTION -->
+        <!-- =========================
+             BOTTOM SECTION
+        ========================= -->
 
-        <div class="grid">
+        <div class="bottom-grid">
+
 
             <!-- TODAY'S DIET -->
 
-            <div class="glass">
+            <div class="bottom-card">
 
                 <h2>
                     🍎 Today's Diet
 
-                    <span style="font-size:14px; color:#c084fc; font-weight:normal;">
+                    <span style="font-size:13px;color:#c084fc;font-weight:normal;">
                         ({{ current_day_name }})
                     </span>
 
@@ -351,41 +1070,30 @@
 
                 {% for meal in today_diet_meals %}
 
-                    <div style="margin-bottom:12px;">
+                    <div class="meal-item">
 
-                        <span style="font-size:10px; color:#94a3b8;
-                                     text-transform:uppercase; font-weight:600;">
-
+                        <div class="meal-name">
                             {{ meal.meal|default:"Meal" }}
+                        </div>
 
-                        </span>
-
-                        <p style="color:#f8fafc; font-size:13px;
-                                  font-weight:500; margin:4px 0;">
-
+                        <div class="meal-food">
                             🍽 {{ meal.food|default:"Food details unavailable" }}
+                        </div>
 
-                        </p>
+                        <div class="meal-details">
 
-                        <div style="display:flex; justify-content:space-between;
-                                    flex-wrap:wrap; gap:6px; font-size:11px;">
-
-                            <span style="color:#818cf8; font-weight:600;">
-                                🔥 {{ meal.calories|default:"0" }} kcal
+                            <span style="color:#818cf8;font-weight:600;">
+                                🔥 {{ meal.calories|default:0 }} kcal
                             </span>
 
-                            <span style="color:#38e8a7; font-weight:600;">
-                                🥩 {{ meal.protein|default:"0" }}g protein
+                            <span style="color:#38e8a7;font-weight:600;">
+                                🥩 {{ meal.protein|default:0 }}g protein
                             </span>
 
                             {% if meal.cost %}
 
-                                <span style="color:#4ade80; font-weight:700;
-                                             background:rgba(74,222,128,0.1);
-                                             padding:2px 6px; border-radius:6px;">
-
+                                <span style="color:#4ade80;font-weight:700;">
                                     {{ meal.cost }}
-
                                 </span>
 
                             {% endif %}
@@ -396,29 +1104,18 @@
 
                     {% if not forloop.last %}
 
-                        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.08);
-                                   margin:10px 0;">
+                        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.08);margin:10px 0;">
 
                     {% endif %}
 
                 {% empty %}
 
-                    <p style="margin-bottom:15px; color:#94a3b8; font-size:13px;">
+                    <p style="color:#94a3b8;font-size:13px;">
                         No diet plan found for today.
                     </p>
 
-                    <a href="{% url 'diet_dashboard' %}"
-                       style="text-decoration:none;">
-
-                        <button type="button"
-                                style="cursor:pointer; padding:8px 12px;
-                                       border-radius:8px; background:#6366f1;
-                                       color:white; border:none; font-size:12px;">
-
-                            View Diet Plan 🍎
-
-                        </button>
-
+                    <a href="{% url 'diet_dashboard' %}" class="body-composition-link">
+                        View Diet Plan 🍎
                     </a>
 
                 {% endfor %}
@@ -428,12 +1125,12 @@
 
             <!-- DAILY PROGRESS -->
 
-            <div class="glass">
+            <div class="bottom-card">
 
                 <h2>📊 Daily Progress</h2>
 
-                <p style="color:#94a3b8; font-size:12px; margin-bottom:15px;">
-                    Track your daily fitness activity
+                <p style="color:#94a3b8;font-size:12px;margin-bottom:15px;">
+                    Your activity today
                 </p>
 
 
@@ -441,55 +1138,45 @@
 
                 <div style="margin-bottom:18px;">
 
-                    <div style="display:flex; justify-content:space-between;
-                                margin-bottom:7px; font-size:13px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px;">
 
                         <span>👣 Steps</span>
 
                         <strong>
-
-                            {{ daily_progress.steps|default:"0" }}
-
+                            {{ daily_progress.steps|default:0 }}
                             /
-
-                            {{ daily_progress.steps_goal|default:"8000" }}
-
+                            {{ daily_progress.steps_goal|default:8000 }}
                         </strong>
 
                     </div>
 
-                    <div style="height:9px; background:rgba(255,255,255,0.1);
-                                border-radius:20px; overflow:hidden;">
+                    <div class="progress-track">
 
-                        <div id="goalProgress"
-                             data-progress="{{ step_percentage|default:0 }}"
-                             style="height:100%; width:0%;
-                                    background-color:#38e8a7;
-                                    border-radius:20px;
-                                    transition:width 0.5s ease;">
-
-                        </div>
+                        <div
+                            id="goalProgress"
+                            class="progress-fill"
+                            data-progress="{{ step_percentage|default:0 }}"
+                        ></div>
 
                     </div>
 
-                    <p style="color:#94a3b8; font-size:11px; margin-top:5px;">
+                    <p style="color:#94a3b8;font-size:11px;margin-top:5px;">
 
-                        {{ step_percentage|default:"0" }}% of your daily step goal
+                        {{ step_percentage|default:0 }}% of daily goal
 
                     </p>
 
                 </div>
 
 
-                <!-- ACTIVITY CALORIES -->
+                <!-- CALORIES -->
 
-                <div style="display:flex; justify-content:space-between;
-                            margin-bottom:14px; font-size:13px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:13px;">
 
                     <span>🔥 Activity Calories</span>
 
                     <strong>
-                        {{ daily_progress.activity_calories|default:"0" }} kcal
+                        {{ daily_progress.activity_calories|default:0 }} kcal
                     </strong>
 
                 </div>
@@ -497,13 +1184,12 @@
 
                 <!-- ACTIVE MINUTES -->
 
-                <div style="display:flex; justify-content:space-between;
-                            margin-bottom:14px; font-size:13px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:13px;">
 
                     <span>❤️ Active Minutes</span>
 
                     <strong>
-                        {{ daily_progress.active_minutes|default:"0" }} min
+                        {{ daily_progress.active_minutes|default:0 }} min
                     </strong>
 
                 </div>
@@ -511,25 +1197,19 @@
 
                 <!-- DISTANCE -->
 
-                <div style="display:flex; justify-content:space-between;
-                            margin-bottom:18px; font-size:13px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px;">
 
                     <span>📍 Distance</span>
 
                     <strong>
-                        {{ daily_progress.distance_km|default:"0" }} km
+                        {{ daily_progress.distance_km|default:0 }} km
                     </strong>
 
                 </div>
 
 
-                <a href="{% url 'progress:progress' %}"
-                   style="display:inline-block; color:#c084fc;
-                          text-decoration:none; font-size:13px;
-                          font-weight:600;">
-
+                <a href="{% url 'progress:progress' %}" style="color:#c084fc;text-decoration:none;font-size:13px;font-weight:600;">
                     View Full Progress →
-
                 </a>
 
             </div>
@@ -537,12 +1217,12 @@
 
             <!-- REMINDERS -->
 
-            <div class="glass">
+            <div class="bottom-card">
 
                 <h2>🔔 Upcoming Reminders</h2>
 
-                <p style="color:#94a3b8; font-size:12px; margin-bottom:15px;">
-                    Your scheduled activities and meal reminders
+                <p style="color:#94a3b8;font-size:12px;margin-bottom:15px;">
+                    Scheduled activities and meals
                 </p>
 
 
@@ -550,26 +1230,25 @@
 
                     {% if reminder.is_active %}
 
-                        <div class="dashboard-reminder"
-                             data-title="{{ reminder.title|escape }}"
-                             data-type="{{ reminder.reminder_type }}"
-                             data-meal="{{ reminder.meal_type|default:'' }}"
-                             data-time="{{ reminder.reminder_time|time:'H:i' }}"
-                             data-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
-                             data-repeat="{{ reminder.repeat }}"
-                             style="padding:10px; margin-bottom:10px;
-                                    background:rgba(255,255,255,0.05);
-                                    border-radius:10px;">
+                        <div
+                            class="dashboard-reminder"
+                            data-title="{{ reminder.title|escape }}"
+                            data-type="{{ reminder.reminder_type }}"
+                            data-meal="{{ reminder.meal_type|default:'' }}"
+                            data-time="{{ reminder.reminder_time|time:'H:i' }}"
+                            data-date="{{ reminder.reminder_date|date:'Y-m-d' }}"
+                            data-repeat="{{ reminder.repeat }}"
+                        >
 
-                            <p style="margin:0; color:#f8fafc;">
+                            <p class="reminder-title">
                                 🔔 {{ reminder.title }}
                             </p>
 
-                            <p style="margin:5px 0 0; color:#c084fc; font-size:12px;">
+                            <p class="reminder-time">
                                 ⏰ {{ reminder.reminder_time|time:'h:i A' }}
                             </p>
 
-                            <p style="margin:5px 0 0; color:#94a3b8; font-size:11px;">
+                            <p class="reminder-repeat">
                                 {{ reminder.repeat }}
                             </p>
 
@@ -579,43 +1258,34 @@
 
                 {% empty %}
 
-                    <p style="color:#94a3b8;">
+                    <p style="color:#94a3b8;font-size:13px;">
                         No reminders available.
                     </p>
 
                 {% endfor %}
 
 
-                <button type="button"
-                        onclick="enableReminderSound()"
-                        style="cursor:pointer; padding:9px 14px;
-                               background:#6366f1; color:white;
-                               border:none; border-radius:8px;
-                               font-weight:600; margin-top:10px;">
-
+                <button
+                    type="button"
+                    id="enableReminderButton"
+                    onclick="enableReminderSound()"
+                    style="cursor:pointer;padding:9px 14px;background:#6366f1;color:white;border:none;border-radius:8px;font-weight:600;margin-top:10px;"
+                >
                     🔊 Enable Reminder Sound
-
                 </button>
 
 
                 <div style="margin-top:15px;">
 
-                    <a href="{% url 'reminders:reminders' %}"
-                       style="color:#c084fc; text-decoration:none;
-                              font-size:13px; font-weight:600;">
-
+                    <a href="{% url 'reminders:reminders' %}" style="color:#c084fc;text-decoration:none;font-size:13px;font-weight:600;">
                         Manage All Reminders →
-
                     </a>
 
                 </div>
 
 
-                <p id="reminderSoundStatus"
-                   style="color:#94a3b8; font-size:11px; margin-top:10px;">
-
+                <p id="reminderSoundStatus" style="color:#94a3b8;font-size:11px;margin-top:10px;">
                     Sound is currently disabled.
-
                 </p>
 
             </div>
@@ -627,68 +1297,59 @@
 </div>
 
 
-<!-- CUSTOM STYLES -->
+<!-- =========================
+     LIVE CLOCK
+========================= -->
 
-<style>
+<script>
 
-.water-button {
-    cursor: pointer;
-    padding: 4px 6px;
-    font-size: 10px;
-    background: #0ea5e9;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-weight: 600;
+function updateLiveClock() {
+
+    const now = new Date();
+
+    const dateElement = document.getElementById("liveDate");
+    const clockElement = document.getElementById("liveClock");
+
+    if (dateElement) {
+
+        dateElement.textContent = now.toLocaleDateString(
+            "en-IN",
+            {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            }
+        );
+
+    }
+
+    if (clockElement) {
+
+        clockElement.textContent = now.toLocaleTimeString(
+            "en-IN",
+            {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true
+            }
+        );
+
+    }
+
 }
 
-.water-button:hover {
-    opacity: 0.8;
-}
+updateLiveClock();
+
+setInterval(updateLiveClock, 1000);
+
+</script>
 
 
-/* LOGIN AND LOGOUT */
-
-.logout-item,
-.login-item {
-    list-style: none;
-    margin-top: 15px;
-    padding: 0;
-}
-
-.logout-item form {
-    width: 100%;
-    margin: 0;
-}
-
-.logout-btn,
-.login-item a {
-    display: block;
-    box-sizing: border-box;
-    width: 100%;
-    padding: 13px 16px;
-    background: rgba(239, 68, 68, 0.15);
-    color: #ffffff;
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    border-radius: 10px;
-    font-size: 15px;
-    font-family: inherit;
-    text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-.logout-btn:hover,
-.login-item a:hover {
-    background: #dc3545;
-    color: white;
-}
-
-</style>
-
-
-<!-- DAILY PROGRESS BAR JAVASCRIPT -->
+<!-- =========================
+     PROGRESS BAR
+========================= -->
 
 <script>
 
@@ -696,28 +1357,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const progressBar = document.getElementById("goalProgress");
 
-    if (progressBar) {
-
-        let percentage = parseFloat(
-            progressBar.getAttribute("data-progress")
-        );
-
-        if (isNaN(percentage)) {
-            percentage = 0;
-        }
-
-        percentage = Math.max(0, Math.min(percentage, 100));
-
-        progressBar.style.width = percentage + "%";
-
+    if (!progressBar) {
+        return;
     }
+
+    let percentage = parseFloat(
+        progressBar.getAttribute("data-progress")
+    );
+
+    if (isNaN(percentage)) {
+        percentage = 0;
+    }
+
+    percentage = Math.max(
+        0,
+        Math.min(percentage, 100)
+    );
+
+    progressBar.style.width = percentage + "%";
 
 });
 
 </script>
 
 
-<!-- REMINDER VOICE AND SOUND JAVASCRIPT -->
+<!-- =========================
+     REMINDER SOUND AND VOICE
+========================= -->
 
 <script>
 
@@ -725,36 +1391,47 @@ let reminderSoundEnabled = false;
 let reminderAudioContext = null;
 
 
-// ENABLE REMINDER SOUND
+// ENABLE SOUND
 
-function enableReminderSound() {
+async function enableReminderSound() {
 
-    const AudioContext =
-        window.AudioContext || window.webkitAudioContext;
+    const AudioContextClass =
+        window.AudioContext ||
+        window.webkitAudioContext;
 
-    if (AudioContext && !reminderAudioContext) {
-        reminderAudioContext = new AudioContext();
+    if (AudioContextClass && !reminderAudioContext) {
+
+        reminderAudioContext = new AudioContextClass();
+
     }
 
     if (reminderAudioContext &&
         reminderAudioContext.state === "suspended") {
 
-        reminderAudioContext.resume();
+        await reminderAudioContext.resume();
 
     }
 
     reminderSoundEnabled = true;
 
-    document.getElementById(
-        "reminderSoundStatus"
-    ).innerText = "Reminder sound enabled successfully!";
+    const statusElement =
+        document.getElementById("reminderSoundStatus");
 
-    speakReminder("FitAI reminders are now enabled.");
+    if (statusElement) {
+
+        statusElement.innerText =
+            "🔊 Voice and sound reminders enabled.";
+
+    }
+
+    speakReminder(
+        "FitAI reminders are now enabled."
+    );
 
 }
 
 
-// PLAY BEEP SOUND
+// BEEP
 
 function playReminderBeep() {
 
@@ -769,9 +1446,13 @@ function playReminderBeep() {
         reminderAudioContext.createGain();
 
     oscillator.connect(gain);
-    gain.connect(reminderAudioContext.destination);
+
+    gain.connect(
+        reminderAudioContext.destination
+    );
 
     oscillator.frequency.value = 800;
+
     gain.gain.value = 0.2;
 
     oscillator.start();
@@ -783,7 +1464,7 @@ function playReminderBeep() {
 }
 
 
-// VOICE REMINDER
+// VOICE
 
 function speakReminder(message) {
 
@@ -792,8 +1473,11 @@ function speakReminder(message) {
     }
 
     if (!("speechSynthesis" in window)) {
+
         playReminderBeep();
+
         return;
+
     }
 
     window.speechSynthesis.cancel();
@@ -802,15 +1486,21 @@ function speakReminder(message) {
         new SpeechSynthesisUtterance(message);
 
     speech.lang = "en-IN";
+
     speech.rate = 0.9;
+
     speech.pitch = 1;
 
     speech.onend = function () {
+
         playReminderBeep();
+
     };
 
     speech.onerror = function () {
+
         playReminderBeep();
+
     };
 
     window.speechSynthesis.speak(speech);
@@ -818,7 +1508,7 @@ function speakReminder(message) {
 }
 
 
-// CURRENT DATE
+// DATE
 
 function getCurrentDate() {
 
@@ -834,7 +1524,7 @@ function getCurrentDate() {
         now.getDate()
     ).padStart(2, "0");
 
-    return year + "-" + month + "-" + day;
+    return `${year}-${month}-${day}`;
 
 }
 
@@ -863,10 +1553,15 @@ function checkDashboardReminders() {
     reminders.forEach(function (reminder) {
 
         const title = reminder.dataset.title;
+
         const type = reminder.dataset.type;
+
         const meal = reminder.dataset.meal;
+
         const time = reminder.dataset.time;
+
         const date = reminder.dataset.date;
+
         const repeat = reminder.dataset.repeat;
 
         let shouldRun = false;
@@ -880,13 +1575,17 @@ function checkDashboardReminders() {
 
         }
 
+
         // ONCE
 
         else if (repeat === "Once") {
 
-            shouldRun = (date === currentDate);
+            shouldRun = (
+                date === currentDate
+            );
 
         }
+
 
         // WEEKLY
 
@@ -898,20 +1597,23 @@ function checkDashboardReminders() {
                     date + "T12:00:00"
                 );
 
-                shouldRun =
-                    reminderDate.getDay() === now.getDay();
+                shouldRun = (
+                    reminderDate.getDay() === now.getDay()
+                );
 
             }
 
         }
 
 
+        // TIME CHECK
+
         if (!shouldRun || time !== currentTime) {
             return;
         }
 
 
-        // PREVENT REPEATED ALERTS
+        // PREVENT MULTIPLE ALERTS
 
         const storageKey =
             "fitai_dashboard_" +
@@ -925,27 +1627,31 @@ function checkDashboardReminders() {
             return;
         }
 
-        localStorage.setItem(storageKey, "true");
+        localStorage.setItem(
+            storageKey,
+            "true"
+        );
 
 
-        // MEAL REMINDER
+        // MEAL
 
         if (type === "Meal" && meal) {
 
             speakReminder(
-                "It's time for " +
+                "It is time for " +
                 meal +
                 ". Please have your meal."
             );
 
         }
 
-        // OTHER REMINDERS
+        // GENERAL REMINDER
 
         else {
 
             speakReminder(
-                "Reminder! " + title
+                "FitAI reminder. " +
+                title
             );
 
         }
@@ -964,5 +1670,28 @@ setInterval(
 
 </script>
 
+
+<!-- =========================
+     AUTO REFRESH
+========================= -->
+
+<script>
+
+// Refresh dashboard data every 60 seconds.
+// Only refresh when the browser tab is visible.
+
+setInterval(function () {
+
+    if (!document.hidden) {
+
+        window.location.reload();
+
+    }
+
+}, 60000);
+
+</script>
+
 </body>
+
 </html>

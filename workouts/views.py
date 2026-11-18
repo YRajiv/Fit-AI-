@@ -1,4 +1,3 @@
-
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -7,9 +6,99 @@ from django.utils import timezone
 from django.db import transaction
 from math import isfinite
 
-from .models import Workout
+from .models import Workout, BodyCompositionRecord
+from .utils import compute_body_composition
 from diet.models import UserFitnessProfile
 from progress.models import DailyProgress
+
+
+# ============================================================
+# BODY COMPOSITION HELPERS
+# ============================================================
+
+def safe_float(value):
+    """
+    Convert a value to float safely.
+    Return None if the value is empty or invalid.
+    """
+
+    if value in (None, ""):
+        return None
+
+    try:
+        number = float(value)
+
+        if not isfinite(number):
+            return None
+
+        return number
+
+    except (ValueError, TypeError):
+        return None
+
+
+def create_body_composition_record(
+    user,
+    height_cm,
+    weight_kg,
+    waist_cm=None,
+    neck_cm=None,
+    hip_cm=None,
+    sex=None,
+    age=None
+):
+    """
+    Create a body-composition record.
+
+    Calculations are formula-based estimates.
+    They are NOT actual DEXA scan measurements.
+    """
+
+    record = BodyCompositionRecord(
+        user=user,
+        measurement_date=timezone.localdate(),
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        waist_cm=waist_cm,
+        neck_cm=neck_cm,
+        hip_cm=hip_cm,
+        sex=sex,
+        age=age,
+        data_source="formula"
+    )
+
+    results = compute_body_composition(record)
+
+    record.bmi = results.get("bmi")
+
+    record.body_fat_percent = results.get(
+        "body_fat_percent"
+    )
+
+    record.fat_mass_kg = results.get(
+        "fat_mass_kg"
+    )
+
+    record.lean_body_mass_kg = results.get(
+        "lean_body_mass_kg"
+    )
+
+    record.waist_to_height_ratio = results.get(
+        "waist_to_height_ratio"
+    )
+
+    record.visceral_fat_risk = results.get(
+        "visceral_fat_risk"
+    )
+
+    record.bmr = results.get("bmr")
+
+    # Skeletal muscle mass is intentionally NOT calculated.
+    # Lean body mass is not the same as skeletal muscle mass.
+
+    record.save()
+
+    return record, results
 
 
 # ============================================================
@@ -94,7 +183,6 @@ EXERCISES = [
         "video": "https://media.istockphoto.com/id/1557755244/video/bodyweight-rear-lunge-fitness-exercise-workout-animation-male-muscle-highlight-demonstration.mp4?s=mp4-640x640-is&k=20&c=fNdsXyUrkMfzkZcycu7qrzlLVOV9sMxycXfe2aWqdZU="
     },
 
-
     # ========================================================
     # BEGINNER - DUMBBELLS
     # ========================================================
@@ -170,7 +258,6 @@ EXERCISES = [
         "goals": ["muscle_gain", "strength", "general_fitness"],
         "video": "https://media.istockphoto.com/id/1521899799/video/dumbbell-bent-over-reverse-row-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=xmm0QWN5NPBjk4by3fQntbxp7y6ZxxS8MAgCg-iH0pM="
     },
-
 
     # ========================================================
     # INTERMEDIATE - DUMBBELLS
@@ -257,7 +344,7 @@ EXERCISES = [
         "sets": 3,
         "reps": 10,
         "goals": ["muscle_gain", "strength", "general_fitness"],
-        "video": "https://media.istockphoto.com/id/1557680175/video/dumbbell-alternate-bench-press-high-start-fitness-exercise-workout-animation-male-muscle.mp4?s=mp4-640x640-is&k=20&c=uTaKL88TpJ3nJdDQZHGjxjeOYFcsnX28MqvU2UfGWys="
+        "video": "https://media.istockphoto.com/id/1557680175/video/dumbbell-alternate-bench-press-high-start-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=uTaKL88TpJ3nJdDQZHGjxjeOYFcsnX28MqvU2UfGWys="
     },
 
     {
@@ -271,7 +358,6 @@ EXERCISES = [
         "goals": ["muscle_gain", "general_fitness"],
         "video": "https://media.istockphoto.com/id/1553022926/video/hammer-curl-dumbbells-simultaneous-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=dmRLPxUY63a6rqPs3sC2Xh4O9_OfqD5CQisSzkj2P4c="
     },
-
 
     # ========================================================
     # INTERMEDIATE - NO EQUIPMENT
@@ -288,7 +374,6 @@ EXERCISES = [
         "goals": ["weight_loss", "general_fitness"],
         "video": None
     },
-
 
     # ========================================================
     # ADVANCED - DUMBBELLS
@@ -315,7 +400,7 @@ EXERCISES = [
         "sets": 4,
         "reps": 10,
         "goals": ["muscle_gain", "strength"],
-        "video": "https://media.istockphoto.com/id/1557680175/video/dumbbell-alternate-bench-press-high-start-fitness-exercise-workout-animation-male-muscle.mp4?s=mp4-640x640-is&k=20&c=uTaKL88TpJ3nJdDQZHGjxjeOYFcsnX28MqvU2UfGWys="
+        "video": "https://media.istockphoto.com/id/1557680175/video/dumbbell-alternate-bench-press-high-start-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=uTaKL88TpJ3nJdDQZHGjxjeOYFcsnX28MqvU2UfGWys="
     },
 
     {
@@ -339,7 +424,7 @@ EXERCISES = [
         "sets": 4,
         "reps": 10,
         "goals": ["muscle_gain", "strength"],
-        "video": "https://media.istockphoto.com/id/1521899799/video/dumbbell-bent-over-reverse-row-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=xmm0QWN5NPBjk4by3fQntbxp7y6ZxxS8MAgCg-iH0pM="
+        "video": "https://media.istockphoto.com/id/1521899799/video/dumbbell-bent-over-reverse-row-fitness-exercise-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=xmm0QWN5NPBjk4by3fQntbxp7y6ZxxS8MAgCg-iH0pM="
     },
 
     {
@@ -377,7 +462,6 @@ EXERCISES = [
         "goals": ["muscle_gain", "strength"],
         "video": "https://media.istockphoto.com/id/1553022926/video/hammer-curl-dumbbells-simultaneous-fitness-exercise-workout-animation-male-muscle-highlight.mp4?s=mp4-640x640-is&k=20&c=dmRLPxUY63a6rqPs3sC2Xh4O9_OfqD5CQisSzkj2P4c="
     },
-
 
     # ========================================================
     # ADVANCED - FULL GYM
@@ -430,7 +514,6 @@ EXERCISES = [
         "goals": ["muscle_gain", "general_fitness"],
         "video": "https://media.istockphoto.com/id/1711159995/video/3d-illustration-of-a-muscular-man-practicing-chest-cable-pec-fly-gym-workout-fit.mp4?s=mp4-640x640-is&k=20&c=ENbu8mriD3EGgm-cYqEF7aeViyfMmzASwATIu6JWzAc="
     },
-
 
     # ========================================================
     # ADVANCED - NO EQUIPMENT
@@ -633,9 +716,15 @@ def recommend_workout(profile, user):
     }
 
 
+# ============================================================
+# WORKOUT RECOMMENDATION API
+# ============================================================
+
 @require_GET
 def workout_recommendation_api(request):
+
     if not request.user.is_authenticated:
+
         return JsonResponse({
             "status": "error",
             "message": "Authentication required."
@@ -646,12 +735,15 @@ def workout_recommendation_api(request):
     ).first()
 
     if profile is None:
+
         return JsonResponse({
             "status": "error",
             "message": "Please complete your fitness profile first."
         }, status=404)
 
-    return JsonResponse(recommend_workout(profile, request.user))
+    return JsonResponse(
+        recommend_workout(profile, request.user)
+    )
 
 
 # ============================================================
@@ -670,8 +762,26 @@ def workouts_view(request):
     ).order_by("-created_at")[:5]
 
     workout_plan = None
+
     form_submitted = False
+
     form_errors = []
+
+    body_composition = None
+
+    body_composition_results = None
+
+    # BODY COMPOSITION FORM VALUES
+
+    selected_sex = ""
+
+    selected_age = ""
+
+    selected_waist = ""
+
+    selected_neck = ""
+
+    selected_hip = ""
 
     # DEFAULT FORM VALUES
 
@@ -696,11 +806,15 @@ def workouts_view(request):
         "Dumbbells",
         "Full Gym"
     ]:
+
         selected_equipment = "No Equipment"
 
     if selected_equipment == "No Equipment":
+
         selected_has_equipment = "No"
+
     else:
+
         selected_has_equipment = "Yes"
 
     # PROCESS FITNESS ASSESSMENT FORM
@@ -740,10 +854,63 @@ def workouts_view(request):
                 "No Equipment"
             ).strip()
 
+            # BODY COMPOSITION INPUTS
+
+            selected_sex = request.POST.get(
+                "sex",
+                ""
+            ).strip()
+
+            selected_age = request.POST.get(
+                "age",
+                ""
+            ).strip()
+
+            selected_waist = request.POST.get(
+                "waist_cm",
+                ""
+            ).strip()
+
+            selected_neck = request.POST.get(
+                "neck_cm",
+                ""
+            ).strip()
+
+            selected_hip = request.POST.get(
+                "hip_cm",
+                ""
+            ).strip()
+
+            sex = (
+                selected_sex
+                if selected_sex in ["M", "F"]
+                else None
+            )
+
+            age = None
+
+            if selected_age:
+
+                try:
+                    age = int(selected_age)
+
+                except (ValueError, TypeError):
+                    age = None
+
+            waist = safe_float(selected_waist)
+
+            neck = safe_float(selected_neck)
+
+            hip = safe_float(selected_hip)
+
             selected_fitness_level = fitness_level
+
             selected_height = height_input
+
             selected_weight = weight_input
+
             selected_has_equipment = has_equipment
+
             selected_equipment = equipment
 
             # VALIDATE FITNESS LEVEL
@@ -811,6 +978,7 @@ def workouts_view(request):
             if has_equipment == "No":
 
                 equipment = "No Equipment"
+
                 selected_equipment = "No Equipment"
 
             elif has_equipment == "Yes":
@@ -825,6 +993,71 @@ def workouts_view(request):
                     form_errors.append(
                         "Please select a valid equipment type."
                     )
+
+            # VALIDATE SEX
+
+            if selected_sex and selected_sex not in ["M", "F"]:
+
+                form_errors.append(
+                    "Please select a valid sex."
+                )
+
+            # VALIDATE AGE
+
+            if selected_age:
+
+                if age is None or age < 15 or age > 100:
+
+                    form_errors.append(
+                        "Age must be between 15 and 100."
+                    )
+
+            # VALIDATE WAIST
+
+            if selected_waist:
+
+                if waist is None or waist < 40 or waist > 250:
+
+                    form_errors.append(
+                        "Waist measurement must be between 40 and 250 cm."
+                    )
+
+            # VALIDATE NECK
+
+            if selected_neck:
+
+                if neck is None or neck < 15 or neck > 100:
+
+                    form_errors.append(
+                        "Neck measurement must be between 15 and 100 cm."
+                    )
+
+            # VALIDATE HIP
+
+            if selected_hip:
+
+                if hip is None or hip < 40 or hip > 250:
+
+                    form_errors.append(
+                        "Hip measurement must be between 40 and 250 cm."
+                    )
+
+            # VALIDATE REQUIRED BODY FAT MEASUREMENTS
+            #
+            # We do not force the user to enter measurements.
+            # Body-fat percentage will be unavailable when
+            # required measurements are missing.
+
+            if (
+                selected_sex == "F"
+                and waist is not None
+                and neck is not None
+                and selected_hip == ""
+            ):
+
+                form_errors.append(
+                    "Hip measurement is required for female body-fat estimation."
+                )
 
             # SAVE PROFILE AND GENERATE WORKOUT
 
@@ -847,6 +1080,23 @@ def workouts_view(request):
                     ]
                 )
 
+                # SAVE BODY COMPOSITION RECORD
+
+                body_composition, body_composition_results = (
+                    create_body_composition_record(
+                        user=request.user,
+                        height_cm=height,
+                        weight_kg=weight,
+                        waist_cm=waist,
+                        neck_cm=neck,
+                        hip_cm=hip,
+                        sex=sex,
+                        age=age
+                    )
+                )
+
+                # GENERATE PERSONALIZED WORKOUT
+
                 workout_plan = recommend_workout(
                     profile,
                     request.user
@@ -866,6 +1116,8 @@ def workouts_view(request):
 
         "form_errors": form_errors,
 
+        # EXISTING FORM VALUES
+
         "selected_fitness_level": selected_fitness_level,
 
         "selected_height": selected_height,
@@ -875,6 +1127,26 @@ def workouts_view(request):
         "selected_has_equipment": selected_has_equipment,
 
         "selected_equipment": selected_equipment,
+
+        # BODY COMPOSITION FORM VALUES
+
+        "selected_sex": selected_sex,
+
+        "selected_age": selected_age,
+
+        "selected_waist": selected_waist,
+
+        "selected_neck": selected_neck,
+
+        "selected_hip": selected_hip,
+
+        # BODY COMPOSITION RESULTS
+
+        "body_composition": body_composition,
+
+        "body_composition_results": body_composition_results,
+
+        # WORKOUT PLAN
 
         "workout_plan": workout_plan,
 

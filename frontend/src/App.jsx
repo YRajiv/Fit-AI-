@@ -495,25 +495,7 @@ function NutritionPage() {
     // Do not set preview until resize complete
     return;
   };
-    setError('');
-    setResult(null);
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Choose an image file to scan.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = typeof reader.result === 'string' ? reader.result : '';
-      setImage(value);
-      setPreview(value);
-    };
-    reader.onerror = () => setError('The selected image could not be read.');
-    reader.readAsDataURL(file);
-  };
-
-  const scan = async (event) => {
+const scan = async (event) => {
     event.preventDefault();
     // Clear previous result but keep image preview
     setResult(null);

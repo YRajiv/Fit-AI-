@@ -1,4 +1,3 @@
-
 import json
 import os
 import traceback
@@ -11,6 +10,8 @@ from django.views.decorators.http import require_POST
 
 from google import genai
 from google.genai import types
+
+from nutrition.ai_fallback import call_groq, call_openai
 
 
 # ============================================================
@@ -39,6 +40,7 @@ if GEMINI_API_KEY:
         client = genai.Client(
             api_key=GEMINI_API_KEY
         )
+
         print("FITAI: Gemini client initialized successfully.")
 
     except Exception:
@@ -59,7 +61,7 @@ def chat_page(request):
     )
 
 
-# Backward compatibility with the old function name
+# Backward compatibility
 chat = chat_page
 
 
@@ -126,7 +128,7 @@ def build_chat_history(history):
     if not isinstance(history, list):
         return contents
 
-    # Use only the latest 12 messages
+    # Use latest 12 messages
     history = history[-12:]
 
     for item in history:
@@ -149,8 +151,8 @@ def build_chat_history(history):
         if not message:
             continue
 
-        # Convert frontend role names into Gemini role names
-        if role in ["user"]:
+        # Convert frontend roles into Gemini roles
+        if role == "user":
 
             gemini_role = "user"
 
@@ -184,21 +186,10 @@ def build_chat_history(history):
 @require_POST
 def send_message(request):
 
-    # Check API key
-    if client is None:
+    # ========================================================
+    # READ REQUEST BODY
+    # ========================================================
 
-        return JsonResponse(
-            {
-                "success": False,
-                "error": (
-                    "Gemini API key is missing or the client "
-                    "could not be initialized. Check your .env file."
-                )
-            },
-            status=503
-        )
-
-    # Read request body
     try:
 
         data = json.loads(
@@ -225,7 +216,10 @@ def send_message(request):
             status=400
         )
 
-    # Get user question
+    # ========================================================
+    # GET USER MESSAGE
+    # ========================================================
+
     user_message = data.get(
         "message",
         ""
@@ -268,10 +262,13 @@ def send_message(request):
             status=400
         )
 
-    # Build conversation history
+    # ========================================================
+    # BUILD GEMINI CONVERSATION
+    # ========================================================
+
     contents = build_chat_history(history)
 
-    # Add the current user question
+    # Add current question
     contents.append(
         types.Content(
             role="user",
@@ -284,182 +281,142 @@ def send_message(request):
     )
 
     # ========================================================
-    # STREAM GEMINI RESPONSE
+    # GENERATE RESPONSE
     # ========================================================
 
     def generate_response():
+        """Generate AI response with provider fallback.
 
+        Attempts Gemini (streaming). If Gemini fails or returns no output,
+        falls back to Groq and then OpenAI using the predefined wrappers.
+        """
         answer_generated = False
+        print("\n========== FITAI CHAT ===========")
+        print("User:", request.user.username)
+        print("Question:", user_message)
+        print("Starting AI provider fallback...")
 
+        # ----------------------------------------------------
+        # Build message payloads for Gemini and for the other providers
+        # ----------------------------------------------------
+        # Gemini uses the internal `contents` list built earlier.
+        # Groq/OpenAI expect a list of dict messages.
+        fallback_messages = [
+            {"role": "system", "content": SYSTEM_INSTRUCTION}
+        ]
+        if isinstance(history, list):
+            for item in history[-12:]:
+                if not isinstance(item, dict):
+                    continue
+                role = item.get("role")
+                message = item.get("content", item.get("text", ""))
+                if not isinstance(message, str):
+                    continue
+                message = message.strip()
+                if not message:
+                    continue
+                if role == "user":
+                    fallback_messages.append({"role": "user", "content": message})
+                elif role in ["assistant", "model", "bot"]:
+                    fallback_messages.append({"role": "assistant", "content": message})
+        fallback_messages.append({"role": "user", "content": user_message})
+
+        # ----------------------------------------------------
+        # Provider call definitions for fallback_chain
+        # ----------------------------------------------------
+        from nutrition.ai_fallback import fallback_chain
+
+        steps = []
+        # Gemini step (non‑streaming for simplicity)
+        if client is not None:
+            def gemini_call():
+                response = client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.7,
+                        max_output_tokens=2048,
+                    ),
+                )
+                # The SDK returns a GenerationResponse; extract text
+                return response.candidates[0].content.parts[0].text if response.candidates else ""
+            steps.append(("gemini", gemini_call))
+        else:
+            # Force failure to trigger next provider
+            def no_gemini():
+                raise RuntimeError("Gemini client unavailable")
+            steps.append(("gemini", no_gemini))
+
+        # Groq step
+        steps.append(("groq", lambda: call_groq(messages=fallback_messages, timeout=30)))
+        # OpenAI step
+        steps.append(("openai", lambda: call_openai(messages=fallback_messages, timeout=30)))
+
+        # ----------------------------------------------------
+        # Execute fallback chain
+        # ----------------------------------------------------
         try:
-
-            print("\n========== FITAI CHAT ==========")
-
-            print("User:", request.user.username)
-
-            print("Question:", user_message)
-
-            print("Gemini model:", GEMINI_MODEL)
-
-            print("Generating response...")
-
-            # Call Gemini streaming API
-            response_stream = client.models.generate_content_stream(
-
-                model=GEMINI_MODEL,
-
-                contents=contents,
-
-                config=types.GenerateContentConfig(
-
-                    system_instruction=SYSTEM_INSTRUCTION,
-
-                    temperature=0.7,
-
-                    max_output_tokens=2048
-
+            response, provider = fallback_chain(steps)
+            # Normalise the answer text depending on provider
+            if provider == "gemini":
+                answer_text = response
+            elif provider == "groq":
+                answer_text = (
+                    response.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
                 )
-
-            )
-
-            # Receive response chunks
-            for chunk in response_stream:
-
-                answer = chunk.text
-
-                if answer:
-
-                    answer_generated = True
-
-                    event_data = json.dumps(
-                        {
-                            "type": "text",
-                            "text": answer
-                        }
-                    )
-
-                    yield (
-                        "data: "
-                        + event_data
-                        + "\n\n"
-                    )
-
-            # Check whether Gemini returned an answer
-            if answer_generated:
-
-                yield (
-                    'data: {"type": "done"}\n\n'
-                )
-
-                print("FITAI: Response completed.")
-
+            elif provider == "openai":
+                answer_text = response.choices[0].message.content
             else:
+                answer_text = ""
 
-                yield (
-                    'data: {"type": "error",'
-                    '"message":"Gemini returned an empty response. Please try again."}'
-                    '\n\n'
-                )
-
-                print("FITAI: Empty response received.")
-
-        except Exception as error:
-
-            # Print complete error in terminal
-            print("\n========== GEMINI ERROR ==========")
-
-            print("Error:", str(error))
-
+            if answer_text and answer_text.strip():
+                answer_generated = True
+                event_data = json.dumps({"type": "text", "text": answer_text})
+                yield "data: " + event_data + "\n\n"
+                yield "data: {\"type\": \"done\"}\n\n"
+                return
+            else:
+                print(f"FITAI: {provider.capitalize()} returned empty response.")
+        except Exception as exc:
+            # If Gemini produced partial output we already yielded it, the
+            # fallback_chain will have raised after the Gemini step. In that
+            # case we surface an error to the client.
+            if answer_generated:
+                event_data = json.dumps({
+                    "type": "error",
+                    "message": (
+                        "The response was interrupted. Please try sending your message again."
+                    ),
+                })
+                yield "data: " + event_data + "\n\n"
+                return
+            print(f"FITAI: {provider if 'provider' in locals() else 'provider'} failed: {exc}")
             traceback.print_exc()
 
-            print("==================================\n")
+        # ----------------------------------------------------
+        # All providers failed – send error to client
+        # ----------------------------------------------------
+        print("FITAI: All AI providers failed.")
+        error_message = (
+            "All AI services are currently unavailable. "
+            "Please try again in a few minutes."
+        )
+        event_data = json.dumps({"type": "error", "message": error_message})
+        yield "data: " + event_data + "\n\n"
 
-            error_text = str(error).lower()
+    # ========================================================
+    # RETURN STREAMING RESPONSE
+    # ========================================================
 
-            # Identify common Gemini errors
-            if (
-                "429" in error_text
-                or "resource_exhausted" in error_text
-            ):
-
-                error_message = (
-                    "Gemini API quota exceeded. "
-                    "Please check your API usage and try again later."
-                )
-
-            elif (
-                "503" in error_text
-                or "unavailable" in error_text
-            ):
-
-                error_message = (
-                    "Gemini is temporarily unavailable. "
-                    "Please try again later."
-                )
-
-            elif (
-                "404" in error_text
-                or "not_found" in error_text
-            ):
-
-                error_message = (
-                    "Gemini model not found. "
-                    "Please check your GEMINI_MODEL configuration."
-                )
-
-            elif (
-                "403" in error_text
-                or "permission_denied" in error_text
-            ):
-
-                error_message = (
-                    "Gemini API access denied. "
-                    "Please check your API key and permissions."
-                )
-
-            elif (
-                "api key" in error_text
-                or "api_key" in error_text
-            ):
-
-                error_message = (
-                    "Gemini API key error. "
-                    "Please check your .env configuration."
-                )
-
-            else:
-
-                error_message = (
-                    "FitAI could not connect to Gemini. "
-                    "Please check the VS Code terminal for details."
-                )
-
-            event_data = json.dumps(
-                {
-                    "type": "error",
-                    "message": error_message
-                }
-            )
-
-            yield (
-                "data: "
-                + event_data
-                + "\n\n"
-            )
-
-    # Return server-sent events response
     response = StreamingHttpResponse(
-
         generate_response(),
-
-        content_type="text/event-stream"
-
+        content_type="text/event-stream",
     )
-
     response["Cache-Control"] = "no-cache, no-transform"
-
     response["X-Accel-Buffering"] = "no"
-
     return response
 
 
